@@ -137,6 +137,7 @@ def write(filename,
           point_data=None,
           cell_data=None,
           field_data=None,
+          regions=None,
           file_format=None
           ):
     '''Writes mesh together with data to a file.
@@ -150,6 +151,7 @@ def write(filename,
     point_data = {} if point_data is None else point_data
     cell_data = {} if cell_data is None else cell_data
     field_data = {} if field_data is None else field_data
+    regions = {} if field_data is None else regions
 
     if not file_format:
         # deduct file format from extension
@@ -181,13 +183,15 @@ def write(filename,
             point_data=point_data,
             cell_data=cell_data,
             field_data=field_data,
+            regions=regions,
             write_binary=(file_format == 'gmsh-binary')
             )
     elif file_format == 'med':
         med_io.write(
             filename, points, cells,
             point_data=point_data,
-            cell_data=cell_data)
+            cell_data=cell_data
+            )
     elif file_format == 'medit':
         medit_io.write(filename, points, cells)
     elif file_format == 'dolfin-xml':

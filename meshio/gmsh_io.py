@@ -122,19 +122,20 @@ def _read_header(f, int_size):
     return data_size, is_ascii
 
 
-def _read_physical_names(f, field_data):
+def _read_physical_names(f):
     line = f.readline().decode('utf-8')
     num_phys_names = int(line)
+    names_dict = {}
     for _ in range(num_phys_names):
         line = f.readline().decode('utf-8')
-        key = line.split(' ')[2].replace('"', '').replace('\n', '')
-        phys_group = int(line.split(' ')[1])
-        phys_dim = int(line.split(' ')[0])
-        value = numpy.array([phys_group, phys_dim], dtype=int)
-        field_data[key] = value
+        words = line.split(' ')
+        # phys_dim = int(words[0])
+        phys_number = int(words[1])
+        phys_name = words[2].replace('"', '').replace('\n', '')
+        names_dict[phys_number] = phys_name
     line = f.readline().decode('utf-8')
     assert line.strip() == '$EndPhysicalNames'
-    return
+    return names_dict
 
 
 def _read_nodes(f, is_ascii, int_size, data_size):
@@ -332,6 +333,8 @@ def read_buffer(f):
     cell_data_raw = {}
     cell_tags = {}
     point_data = {}
+    regions = {}
+    physical_names = {}
 
     is_ascii = None
     int_size = 4
@@ -347,7 +350,7 @@ def read_buffer(f):
         if environ == 'MeshFormat':
             data_size, is_ascii = _read_header(f, int_size)
         elif environ == 'PhysicalNames':
-            _read_physical_names(f, field_data)
+            physical_names = _read_physical_names(f, field_data)
         elif environ == 'Nodes':
             points = _read_nodes(f, is_ascii, int_size, data_size)
         elif environ == 'Elements':
@@ -371,15 +374,18 @@ def read_buffer(f):
 
     cell_data = cell_data_from_raw(cells, cell_data_raw)
 
-    # merge cell_tags into cell_data
-    for key, tag_dict in cell_tags.items():
-        if key not in cell_data:
-            cell_data[key] = {}
-        for name, item_list in tag_dict.items():
-            assert name not in cell_data[key]
-            cell_data[key][name] = item_list
+    for cell_type, rgns in cell_tags.items():
+        regions[cell_type] = {}
+        for name, tag_list in rgns.items():
+            u = numpy.unique(tag_list)
+            for tag in u:
+                if name == 'physical' and tag in physical_names:
+                    key = physical_names[tag]
+                else:
+                    key = '{}-{}'.format(name, tag)
+                regions[cell_type][key] = numpy.where(tag_list == tag)[0]
 
-    return points, cells, point_data, cell_data, field_data
+    return points, cells, point_data, cell_data, field_data, regions
 
 
 def cell_data_from_raw(cells, cell_data_raw):
@@ -560,6 +566,7 @@ def write(
         point_data=None,
         cell_data=None,
         field_data=None,
+        regions=None,
         write_binary=True,
         ):
     '''Writes msh files, cf.
