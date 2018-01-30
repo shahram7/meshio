@@ -53,6 +53,46 @@ num_nodes_per_cell = {
     'hexahedron216': 216,
     }
 
+
+dimensionality_per_cell = {
+    'vertex': 0,
+    'line': 1,
+    'triangle': 2,
+    'quad': 2,
+    'quad8': 2,
+    'tetra': 3,
+    'hexahedron': 3,
+    'hexahedron20': 3,
+    'wedge': 3,
+    'pyramid': 3,
+    #
+    'line3': 1,
+    'triangle6': 2,
+    'quad9': 2,
+    'tetra10': 3,
+    'hexahedron27': 3,
+    'prism18': 3,
+    'pyramid14': 3,
+    #
+    'line4': 1,
+    'triangle10': 2,
+    'quad16': 2,
+    'tetra20': 3,
+    'hexahedron64': 3,
+    #
+    'line5': 1,
+    'triangle15': 2,
+    'quad25': 2,
+    'tetra35': 3,
+    'hexahedron125': 3,
+    #
+    'line6': 1,
+    'triangle21': 2,
+    'quad36': 2,
+    'tetra56': 3,
+    'hexahedron216': 3,
+    }
+
 # Translate meshio types to gmsh codes
 # http://gmsh.info//doc/texinfo/gmsh.html#MSH-ASCII-file-format
 _gmsh_to_meshio_type = {
@@ -350,7 +390,7 @@ def read_buffer(f):
         if environ == 'MeshFormat':
             data_size, is_ascii = _read_header(f, int_size)
         elif environ == 'PhysicalNames':
-            physical_names = _read_physical_names(f, field_data)
+            physical_names = _read_physical_names(f)
         elif environ == 'Nodes':
             points = _read_nodes(f, is_ascii, int_size, data_size)
         elif environ == 'Elements':
@@ -377,12 +417,13 @@ def read_buffer(f):
     for cell_type, rgns in cell_tags.items():
         regions[cell_type] = {}
         for name, tag_list in rgns.items():
+            # See <https://stackoverflow.com/q/48528404/353337> for potentially
+            # more efficient solutions.
             u = numpy.unique(tag_list)
             for tag in u:
-                if name == 'physical' and tag in physical_names:
-                    key = physical_names[tag]
-                else:
-                    key = '{}-{}'.format(name, tag)
+                key = '{}-{}'.format(name, tag)
+                if tag in physical_names:
+                    key += '-{}'.format(physical_names[tag])
                 regions[cell_type][key] = numpy.where(tag_list == tag)[0]
 
     return points, cells, point_data, cell_data, field_data, regions
@@ -400,23 +441,11 @@ def cell_data_from_raw(cells, cell_data_raw):
     return cell_data
 
 
-def _write_physical_names(fh, field_data):
-    # Write physical names
-    entries = []
-    for phys_name in field_data:
-        try:
-            phys_num, phys_dim = field_data[phys_name]
-            phys_num, phys_dim = int(phys_num), int(phys_dim)
-            entries.append((phys_dim, phys_num, phys_name))
-        except (ValueError, TypeError):
-            logging.warning(
-                'Field data contains entry that cannot be processed.'
-            )
-    entries.sort()
-    if entries:
+def _write_physical_names(fh, physical_names):
+    if physical_names:
         fh.write('$PhysicalNames\n'.encode('utf-8'))
-        fh.write('{}\n'.format(len(entries)).encode('utf-8'))
-        for entry in entries:
+        fh.write('{}\n'.format(len(physical_names)).encode('utf-8'))
+        for entry in physical_names:
             fh.write('{} {} "{}"\n'.format(*entry).encode('utf-8'))
         fh.write('$EndPhysicalNames\n'.encode('utf-8'))
     return
@@ -442,7 +471,43 @@ def _write_nodes(fh, points, write_binary):
     return
 
 
-def _write_elements(fh, cells, write_binary):
+def _translate_regions(n, regions):
+    physical = {}
+    geometrical = {}
+    for key, indices in regions.items():
+        # The keys are either 'physical-<number>', 'geometrical-<number>',
+        # or the name of a physical entity,
+        if key[:8] == 'physical':
+            assert key[8] == '-'
+            tag = int(key[9:])
+            physical[tag] = indices
+        else:
+            assert key[:11] == 'geometrical'
+            assert key[11] == '-'
+            tag = int(key[12:])
+            geometrical[tag] = indices
+
+    # Assert that all nodes are listed in the arrays
+    assert numpy.all(
+        numpy.sort(numpy.concatenate(list(physical.values())))
+        == numpy.arange(n)
+        )
+    assert numpy.all(
+        numpy.sort(numpy.concatenate(list(geometrical.values())))
+        == numpy.arange(n)
+        )
+
+    physical_tags = numpy.empty(n, dtype=numpy.int32)
+    for tag, indices in physical.items():
+        physical_tags[indices] = tag
+    geometrical_tags = numpy.empty(n, dtype=numpy.int32)
+    for tag, indices in geometrical.items():
+        geometrical_tags[indices] = tag
+
+    return numpy.array([physical_tags, geometrical_tags]).T
+
+
+def _write_elements(fh, cells, regions, physical_names, write_binary):
     # write elements
     fh.write('$Elements\n'.encode('utf-8'))
     # count all cells
@@ -451,33 +516,10 @@ def _write_elements(fh, cells, write_binary):
 
     consecutive_index = 0
     for cell_type, node_idcs in cells.items():
-        # if cell_type in cell_data and cell_data[cell_type]:
-        #     for key in cell_data[cell_type]:
-        #         # assert data consistency
-        #         assert len(cell_data[cell_type][key]) == len(node_idcs)
-        #         # TODO assert that the data type is int
-
-        #     # if a tag is present, make sure that there are 'physical' and
-        #     # 'geometrical' as well.
-        #     if 'physical' not in cell_data[cell_type]:
-        #         cell_data[cell_type]['physical'] = \
-        #             numpy.ones(len(node_idcs), dtype=numpy.int32)
-        #     if 'geometrical' not in cell_data[cell_type]:
-        #         cell_data[cell_type]['geometrical'] = \
-        #             numpy.ones(len(node_idcs), dtype=numpy.int32)
-
-        #     # 'physical' and 'geometrical' go first; this is what the gmsh
-        #     # file format prescribes
-        #     keywords = list(cell_data[cell_type].keys())
-        #     keywords.remove('physical')
-        #     keywords.remove('geometrical')
-        #     sorted_keywords = ['physical', 'geometrical'] + keywords
-        #     fcd = numpy.column_stack([
-        #             cell_data[cell_type][key] for key in sorted_keywords
-        #             ])
-        # else:
-        # no cell data
-        fcd = numpy.empty([len(node_idcs), 0], dtype=numpy.int32)
+        if not regions:
+            fcd = numpy.empty([len(node_idcs), 0], dtype=numpy.int32)
+        else:
+            fcd = _translate_regions(len(node_idcs), regions[cell_type])
 
         if write_binary:
             # header
@@ -565,7 +607,6 @@ def write(
         cells,
         point_data=None,
         cell_data=None,
-        field_data=None,
         regions=None,
         write_binary=True,
         ):
@@ -574,7 +615,25 @@ def write(
     '''
     point_data = {} if point_data is None else point_data
     cell_data = {} if cell_data is None else cell_data
-    field_data = {} if field_data is None else field_data
+    regions = {} if regions is None else regions
+
+    write_binary = False
+
+    # Make sure to translate physical names
+    physical_names = []
+    for cell_type, data in regions.items():
+        for key in data:
+            # physical-1-copper
+            if key[:8] == 'physical':
+                parts = key.split('-')
+                if len(parts) > 2:
+                    physical_names.append((
+                        int(parts[1]),
+                        dimensionality_per_cell[cell_type],
+                        '-'.join(parts[2:])
+                        ))
+                    new_key = 'physical-{}'.format(parts[1])
+                    data[new_key] = data.pop(key)
 
     if write_binary:
         for key in cells:
@@ -596,11 +655,10 @@ def write(
             fh.write('\n'.encode('utf-8'))
         fh.write('$EndMeshFormat\n'.encode('utf-8'))
 
-        if field_data:
-            _write_physical_names(fh, field_data)
+        _write_physical_names(fh, physical_names)
 
         _write_nodes(fh, points, write_binary)
-        _write_elements(fh, cells, write_binary)
+        _write_elements(fh, cells, regions, {}, write_binary)
         for name, dat in point_data.items():
             _write_data(fh, 'NodeData', name, dat, write_binary)
         cell_data_raw = raw_from_cell_data(cell_data)
