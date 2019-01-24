@@ -51,6 +51,7 @@ abaqus_to_meshio_type = {
     "S3": "triangle",
     "S3R": "triangle",
     "S3RS": "triangle",
+    "R3D3": "triangle",
     # "TRI7": "triangle7",
     # 'TRISHELL': 'triangle',
     # 'TRISHELL3': 'triangle',
@@ -111,7 +112,7 @@ def read_buffer(f):
             # EOF
             break
 
-        if line.startswith("*"):
+        if line.startswith("*") and "Output" not in line:
             word = line.strip("*").upper()
             if word == "HEADING":
                 pass
@@ -141,9 +142,8 @@ def read_buffer(f):
 
     cells = _scan_cells(point_gids, cells)
 
-    return Mesh(
-        points, cells, point_data=point_data, cell_data=cell_data, field_data=field_data
-    )
+    return Mesh(points, cells, point_data=point_data, cell_data=cell_data,
+                field_data=field_data)
 
 
 def _read_nodes(f):
