@@ -18,6 +18,7 @@ from . import svg_io
 from . import vtk_io
 from . import vtu_io
 from . import xdmf_io
+from . import patran_io
 
 input_filetypes = [
     "abaqus",
@@ -39,6 +40,7 @@ input_filetypes = [
     "vtu-ascii",
     "vtu-binary",
     "xdmf",
+    "patran"
 ]
 
 output_filetypes = [
@@ -92,6 +94,7 @@ _extension_to_filetype = {
     ".inp": "abaqus",
     ".mdpa": "mdpa",
     ".svg": "svg",
+    ".pat": "patran",
 }
 
 
@@ -165,6 +168,7 @@ def read(filename, file_format=None):
         "abaqus": abaqus_io,
         #
         "mdpa": mdpa_io,
+        "patran": patran_io
     }
 
     assert file_format in format_to_reader, "Unknown file format '{}' of '{}'.".format(
@@ -257,4 +261,5 @@ _writer_map = {
     "exodus": (exodus_io, (), {}),
     "mdpa": (mdpa_io, (), {}),
     "svg": (svg_io, (), {}),
+    "patran": (patran_io, (), {}),
 }
