@@ -261,5 +261,4 @@ _writer_map = {
     "exodus": (exodus_io, (), {}),
     "mdpa": (mdpa_io, (), {}),
     "svg": (svg_io, (), {}),
-    "patran": (patran_io, (), {}),
 }

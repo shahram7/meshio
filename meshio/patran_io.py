@@ -1,7 +1,18 @@
 # -*- coding: utf-8 -*-
 #
-"""
-I/O for Patran files.
+"""I/O for Patran files.
+
+The geometry is read from the provided *.pat file. If a file with the same
+name and ending *.ele or *.nod is provided, cell data and point data is added.
+
+This feature is designed to convert Patran files generated from Modlflow(See
+https://knowledge.autodesk.com/support/moldflow-insight/learn-explore/
+caas/CloudHelp/cloudhelp/2018/ENU/MoldflowInsight/files/
+GUID-BCC20E1A-12EA-428F-95F5-C1E4BC1E416C-htm.html and
+https://knowledge.autodesk.com/support/moldflow-insight/learn-explore/
+caas/sfdcarticles/sfdcarticles/How-to-export-fiber-orientation-results
+-in-XML-or-Patran-format-from-Moldflow.html)
+
 """
 
 import os
@@ -35,12 +46,13 @@ def read(filename):
     data_filename = filename.replace('.pat', '.nod')
     if os.path.isfile(data_filename):
         with open(data_filename, "r") as f:
-            mesh = read_ele_buffer(f, mesh, point_gids)
+            mesh = read_nod_buffer(f, mesh, point_gids)
 
     return mesh
 
 
 def read_ele_buffer(f, mesh, element_gids):
+    """Read element based data file."""
     elem_id_map = {}
     for line, id in enumerate(element_gids):
         elem_id_map[id] = line
@@ -67,6 +79,7 @@ def read_ele_buffer(f, mesh, element_gids):
 
 
 def read_nod_buffer(f, mesh, point_gids):
+    """Read node based data file."""
     node_id_map = {}
     for line, id in enumerate(point_gids):
         node_id_map[id] = line
@@ -88,6 +101,7 @@ def read_nod_buffer(f, mesh, point_gids):
 
     mesh.point_data = {name: array}
     return mesh
+
 
 def read_pat_buffer(f):
     # Initialize the optional data fields
@@ -125,7 +139,9 @@ def read_pat_buffer(f):
 
 
 def _read_node(f):
-    """ The node card contains the following:
+    """Read a node card.
+
+    The node card contains the following:
     === ===== === ====== === ===
      1  ID    IV  KC
     === ===== === ====== === ===
@@ -141,7 +157,8 @@ def _read_node(f):
 
 
 def _read_cell(f):
-    """
+    """Read a cell card.
+
     The element card contains the following:
     ====== ====== === ==== == == ==
     2      ID     IV  KC   N1 N2
@@ -165,6 +182,6 @@ def _scan_cells(point_gids, cells):
 
 
 def write(filename, mesh):
-    # write a dummy
+    """Write a dummy for now."""
     with open(filename, "wt") as f:
         f.write("DUMMY")
