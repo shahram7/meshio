@@ -31,6 +31,7 @@ meshio can read and write all of the following and smoothly converts between the
  * [VTK](https://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf)
  * [VTU](https://www.vtk.org/Wiki/VTK_XML_Formats)
  * [XDMF](http://www.xdmf.org/index.php/XDMF_Model_and_Format)
+ * [Patran](http://www.mscsoftware.com/product/patran)
 
 Simply call
 ```
