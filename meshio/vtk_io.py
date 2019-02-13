@@ -107,7 +107,7 @@ numpy_to_vtk_dtype = {v: k for k, v in vtk_to_numpy_dtype_name.items()}
 
 
 def read(filename):
-    """Reads a VTK vtk file.
+    """Reads a Gmsh msh file.
     """
     with open(filename, "rb") as f:
         out = read_buffer(f)
@@ -125,7 +125,7 @@ def read_buffer(f):
     f.readline()
     f.readline()
 
-    data_type = f.readline().decode("utf-8").strip().upper()
+    data_type = f.readline().decode("utf-8").strip()
     assert data_type in ["ASCII", "BINARY"], "Unknown VTK data type '{}'.".format(
         data_type
     )
@@ -152,18 +152,20 @@ def read_buffer(f):
             continue
 
         split = line.split()
-        section = split[0].upper()
+        section = split[0]
 
         if section == "DATASET":
-            dataset_type = split[1].upper()
+            dataset_type = split[1]
             assert (
                 dataset_type == "UNSTRUCTURED_GRID"
-            ), "Only VTK UNSTRUCTURED_GRID supported (not {}).".format(dataset_type)
+            ), "Only VTK UNSTRUCTURED_GRID supported (not {}).".format(
+                dataset_type
+            )
 
         elif section == "POINTS":
             active = "POINTS"
             num_points = int(split[1])
-            data_type = split[2].lower()
+            data_type = split[2]
             points = _read_points(f, data_type, is_ascii, num_points)
 
         elif section == "CELLS":
@@ -183,11 +185,6 @@ def read_buffer(f):
         elif section == "CELL_DATA":
             active = "CELL_DATA"
             num_items = int(split[1])
-
-        elif section == "LOOKUP_TABLE":
-            num_items = int(split[2])
-            data = numpy.fromfile(f, count=num_items * 4, sep=" ", dtype=float)
-            rgba = data.reshape((num_items, 4))  # noqa F841
 
         elif section == "SCALARS":
             if active == "POINT_DATA":
@@ -209,7 +206,7 @@ def read_buffer(f):
                 )
                 d = cell_data_raw
 
-            d.update(_read_vector_field(f, num_items, split))
+            d.update(_read_vector_field(f, num_items, split, is_ascii))
 
         elif section == "TENSORS":
             if active == "POINT_DATA":
@@ -285,7 +282,7 @@ def _read_cell_types(f, is_ascii, num_items):
 
 def _read_scalar_field(f, num_data, split):
     data_name = split[1]
-    data_type = split[2].lower()
+    data_type = split[2]
     try:
         num_comp = int(split[3])
     except IndexError:
@@ -297,25 +294,28 @@ def _read_scalar_field(f, num_data, split):
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     lt, _ = f.readline().decode("utf-8").split()
-    assert lt.upper() == "LOOKUP_TABLE"
+    assert lt == "LOOKUP_TABLE"
     data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
 
     return {data_name: data}
 
 
-def _read_vector_field(f, num_data, split):
+def _read_vector_field(f, num_data, split, is_ascii):
     data_name = split[1]
     data_type = split[2]
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
-    data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
+    if is_ascii:
+        data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
+    else:
+        data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
 
     return {data_name: data}
 
 
 def _read_tensor_field(f, num_data, split):
     data_name = split[1]
-    data_type = split[2].lower()
+    data_type = split[2]
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
@@ -329,7 +329,7 @@ def _read_fields(f, num_fields, is_ascii):
         name, shape0, shape1, data_type = f.readline().decode("utf-8").split()
         shape0 = int(shape0)
         shape1 = int(shape1)
-        dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type.lower()])
+        dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
 
         if is_ascii:
             dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
@@ -382,7 +382,7 @@ def translate_cells(data, types, cell_data_raw):
     return cells, cell_data
 
 
-def write(filename, mesh, write_binary=True):
+def write(filename, mesh, write_binary=True, encoding='utf-8'):
     if mesh.points.shape[1] == 2:
         logging.warning(
             "VTK requires 3D points, but 2D points given. "
@@ -394,48 +394,88 @@ def write(filename, mesh, write_binary=True):
 
     if not write_binary:
         logging.warning("VTK ASCII files are only meant for debugging.")
+        
+    if not write_binary:
+        with open(filename, "w") as f:
+            f.write("# vtk DataFile Version 4.2\n")
+            f.write("{}\n".format(filename))
+            #f.write("written by meshio v{}\n".format(__version__))
+            f.write(("BINARY\n" if write_binary else "ASCII\n"))
+            f.write("DATASET UNSTRUCTURED_GRID\n\n")
 
-    with open(filename, "wb") as f:
-        f.write("# vtk DataFile Version 4.2\n".encode("utf-8"))
-        f.write("written by meshio v{}\n".format(__version__).encode("utf-8"))
-        f.write(("BINARY\n" if write_binary else "ASCII\n").encode("utf-8"))
-        f.write("DATASET UNSTRUCTURED_GRID\n".encode("utf-8"))
+            # write points and cells
+            _write_points(f, mesh.points, write_binary)
+            _write_cells(f, mesh.cells, write_binary)
 
-        # write points and cells
-        _write_points(f, mesh.points, write_binary)
-        _write_cells(f, mesh.cells, write_binary)
+            # write point data
+            if mesh.point_data:
+                num_points = mesh.points.shape[0]
+                f.write("POINT_DATA {}\n".format(num_points))
+                _write_field_data(f, mesh.point_data, write_binary)
 
-        # write point data
-        if mesh.point_data:
-            num_points = mesh.points.shape[0]
-            f.write("POINT_DATA {}\n".format(num_points).encode("utf-8"))
-            _write_field_data(f, mesh.point_data, write_binary)
+            # write cell data
+            if mesh.cell_data:
+                total_num_cells = sum([len(c) for c in mesh.cells.values()])
+                cell_data_raw = raw_from_cell_data(mesh.cell_data)
+                f.write("CELL_DATA {}\n".format(total_num_cells))
+                _write_field_data(f, cell_data_raw, write_binary)
 
-        # write cell data
-        if mesh.cell_data:
-            total_num_cells = sum([len(c) for c in mesh.cells.values()])
-            cell_data_raw = raw_from_cell_data(mesh.cell_data)
-            f.write("CELL_DATA {}\n".format(total_num_cells).encode("utf-8"))
-            _write_field_data(f, cell_data_raw, write_binary)
+    elif write_binary:
+        with open(filename, "wb") as f:
+            f.write("# vtk DataFile Version 4.2\n".encode("utf-8"))
+            f.write("{}\n".format(filename).encode("utf-8"))
+            #f.write("written by meshio v{}\n".format(__version__))
+            f.write(("BINARY\n" if write_binary else "ASCII\n").encode("utf-8"))
+            f.write("DATASET UNSTRUCTURED_GRID\n\n".encode("utf-8"))
+
+            # write points and cells
+            _write_points(f, mesh.points, write_binary)
+            _write_cells(f, mesh.cells, write_binary)
+
+            # write point data
+            if mesh.point_data:
+                num_points = mesh.points.shape[0]
+                f.write("POINT_DATA {}\n".format(num_points).encode("utf-8"))
+                _write_field_data(f, mesh.point_data, write_binary)
+
+            # write cell data
+            if mesh.cell_data:
+                total_num_cells = sum([len(c) for c in mesh.cells.values()])
+                cell_data_raw = raw_from_cell_data(mesh.cell_data)
+                f.write("CELL_DATA {}\n".format(total_num_cells).encode("utf-8"))
+                _write_field_data(f, cell_data_raw, write_binary)
+
 
     return
 
 
 def _write_points(f, points, write_binary):
-    f.write(
-        "POINTS {} {}\n".format(
-            len(points), numpy_to_vtk_dtype[points.dtype.name]
-        ).encode("utf-8")
-    )
+    if write_binary:
+        f.write(
+            "POINTS {} {}\n".format(
+                len(points), numpy_to_vtk_dtype[points.dtype.name]
+            ).encode("utf-8")
+        )
+    else:
+        f.write(
+            "POINTS {} {}\n".format(
+                len(points), numpy_to_vtk_dtype[points.dtype.name]
+            )
+        )
 
     if write_binary:
         # Binary data must be big endian, see
         # <https://www.vtk.org/Wiki/VTK/Writing_VTK_files_using_python#.22legacy.22>.
         points.astype(points.dtype.newbyteorder(">")).tofile(f, sep="")
     else:
-        # ascii
-        points.tofile(f, sep=" ")
-    f.write("\n".encode("utf-8"))
+        for point in points:
+            point.tofile(f,sep= ' ')
+            f.write('\n')
+        #points.tofile(f, sep=" ")
+    if write_binary:
+        f.write("\n".encode("utf-8"))
+    else:
+        f.write("\n")
     return
 
 
@@ -444,11 +484,14 @@ def _write_cells(f, cells, write_binary):
     total_num_idx = sum([numpy.prod(c.shape) for c in cells.values()])
     # For each cell, the number of nodes is stored
     total_num_idx += total_num_cells
-    f.write("CELLS {} {}\n".format(total_num_cells, total_num_idx).encode("utf-8"))
+    if write_binary:
+        f.write("CELLS {} {}\n".format(total_num_cells, total_num_idx).encode("utf-8"))
+    else:
+        f.write("CELLS {} {}\n".format(total_num_cells, total_num_idx))
     if write_binary:
         for key in cells:
             n = cells[key].shape[1]
-            d = numpy.column_stack([numpy.full(len(cells[key]), n), cells[key]]).astype(
+            d = numpy.column_stack([numpy.ones(len(cells[key]))*n, cells[key]]).astype(
                 numpy.dtype(">i4")
             )
             f.write(d.tostring())
@@ -465,14 +508,22 @@ def _write_cells(f, cells, write_binary):
                             ["{}".format(idx) for idx in numpy.concatenate([[n], cell])]
                         )
                         + "\n"
-                    ).encode("utf-8")
+                    )
                 )
+    if write_binary:
+        f.write("\n".encode("utf-8"))
+    else:
+        f.write("\n")
+        f.write("\n")
 
     # write cell types
-    f.write("CELL_TYPES {}\n".format(total_num_cells).encode("utf-8"))
+    if write_binary:
+        f.write("CELL_TYPES {}\n".format(total_num_cells).encode("utf-8"))
+    else:
+        f.write("CELL_TYPES {}\n".format(total_num_cells))
     if write_binary:
         for key in cells:
-            d = numpy.full(len(cells[key]), meshio_to_vtk_type[key]).astype(
+            d = (numpy.ones(len(cells[key]))*meshio_to_vtk_type[key]).astype(
                 numpy.dtype(">i4")
             )
             f.write(d.tostring())
@@ -481,22 +532,30 @@ def _write_cells(f, cells, write_binary):
         # ascii
         for key in cells:
             for _ in range(len(cells[key])):
-                f.write("{}\n".format(meshio_to_vtk_type[key]).encode("utf-8"))
+                f.write("{}\n".format(meshio_to_vtk_type[key]))
+        f.write("\n")
     return
 
 
 def _write_field_data(f, data, write_binary):
-    f.write(("FIELD FieldData {}\n".format(len(data))).encode("utf-8"))
+    #f.write(("CELL DATA {}\n".format(len(data))))
     for name, values in data.items():
         if len(values.shape) == 1:
             num_tuples = values.shape[0]
             num_components = 1
+            field_value_type = 'SCALARS'
         else:
             assert (
-                len(values.shape) == 2
+                len(values.shape) in [2,3]
             ), "Only one and two-dimensional field data supported."
             num_tuples = values.shape[0]
-            num_components = values.shape[1]
+            if len(values.shape) == 2:
+                num_components = values.shape[1]
+                field_value_type = 'VECTORS'
+            else:
+                num_components = values.shape[1]*values.shape[2]
+                num_dim = values.shape[1]
+                field_value_type = 'TENSORS'
 
         if " " in name:
             logging.warning(
@@ -505,22 +564,43 @@ def _write_field_data(f, data, write_binary):
                 name.replace(" ", "_"),
             )
             name = name.replace(" ", "_")
-
-        f.write(
-            (
-                "{} {} {} {}\n".format(
-                    name,
-                    num_components,
-                    num_tuples,
-                    numpy_to_vtk_dtype[values.dtype.name],
+        if not write_binary:
+            f.write(
+                (
+                    "{} {} {}\n".format(
+                        field_value_type,
+                        name,
+                        numpy_to_vtk_dtype[values.dtype.name],
+                    )
                 )
-            ).encode("utf-8")
-        )
+            )
+            if field_value_type == 'SCALARS':
+                f.write("LOOKUP_TABLE default\n")
+        else:
+            f.write(
+                (
+                    "{} {} {}\n".format(
+                        field_value_type,
+                        name,
+                        numpy_to_vtk_dtype[values.dtype.name],
+                    )
+                ).encode("utf-8")
+            )
+        if field_value_type == 'SCALARS':
+                f.write("LOOKUP_TABLE default\n").  encode("utf-8")
+        if field_value_type == 'TENSORS':
+            values = values.reshape(num_tuples*num_dim, num_dim) #achieve order
         if write_binary:
-            values.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
+            values.astype(values.dtype.newbyteorder(">")).tofile(f, sep=" ")
         else:
             # ascii
-            values.tofile(f, sep=" ")
+            #values.tofile(f, sep=" ")
+            for value in values:
+                value.tofile(f, sep= ' ')
+                f.write('\n')
             # numpy.savetxt(f, points)
+    if write_binary:
         f.write("\n".encode("utf-8"))
+    else:
+        f.write("\n")
     return
