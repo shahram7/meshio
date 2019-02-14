@@ -95,3 +95,12 @@ class Mesh(object):
             self.cells[key] = all_cells_flat[k : k + n].reshape(s)
             k += n
         return
+        
+    def transform(self, transformation_matrix):
+        homgenous_points = numpy.c_[self.points, numpy.ones(len(self.points))]
+        self.points = numpy.einsum('ij,kj -> ki',
+                                    transformation_matrix,
+                                    homgenous_points)[:,:3]
+    
+    def merge(self, other):
+        pass

@@ -217,7 +217,7 @@ def read_buffer(f):
                 )
                 d = cell_data_raw
 
-            d.update(_read_tensor_field(f, num_items, split))
+            d.update(_read_tensor_field(f, num_items, split, is_ascii))
 
         else:
             assert section == "FIELD", "Unknown section '{}'.".format(section)
@@ -308,17 +308,20 @@ def _read_vector_field(f, num_data, split, is_ascii):
     if is_ascii:
         data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
     else:
-        data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
+        data = numpy.fromfile(f, count=num_data, sep="", dtype=dtype)
 
     return {data_name: data}
 
 
-def _read_tensor_field(f, num_data, split):
+def _read_tensor_field(f, num_data, split, is_ascii):
     data_name = split[1]
     data_type = split[2]
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
-    data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
+    if is_ascii:
+        data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
+    else:
+        data = numpy.fromfile(f, count=9 * num_data, sep="", dtype=dtype).reshape(-1, 3, 3)
 
     return {data_name: data}
 
@@ -591,7 +594,8 @@ def _write_field_data(f, data, write_binary):
         if field_value_type == 'TENSORS':
             values = values.reshape(num_tuples*num_dim, num_dim) #achieve order
         if write_binary:
-            values.astype(values.dtype.newbyteorder(">")).tofile(f, sep=" ")
+            for value in values:
+                value.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
         else:
             # ascii
             #values.tofile(f, sep=" ")
