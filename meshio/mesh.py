@@ -97,10 +97,47 @@ class Mesh(object):
         return
         
     def transform(self, transformation_matrix):
+        # transform node coordinates
         homgenous_points = numpy.c_[self.points, numpy.ones(len(self.points))]
         self.points = numpy.einsum('ij,kj -> ki',
                                     transformation_matrix,
                                     homgenous_points)[:,:3]
-    
+        
+        # transform node fields
+        for field_name, field_values in self.point_data.items():
+            if len(field_values.shape) == 1:  # SCALAR
+                continue
+            elif len(field_values.shape) == 2:  # VECTOR
+                # get rotation
+                R = transformation_matrix[:3, :3]
+                rvf = numpy.einsum('ij, kj -> ki',
+                                    R, field_values)
+                self.point_data.update({field_name: rvf})
+            elif len(field_values.shape) == 3:   # TENSOR
+                # get rotation
+                R = transformation_matrix[:3, :3]
+                rtf = numpy.einsum('ij, kjm, nm -> kin',
+                                   R, field_values, R)
+                self.point_data.update({field_name: rtf})
+                
+        # transform cell fields
+        for etype, cf_dict in self.cell_data.items():
+            for field_name, field_values in cf_dict.items():
+                if len(field_values.shape) == 1:  # SCALAR
+                    continue
+                elif len(field_values.shape) == 2:  # VECTOR
+                    # get rotation
+                    R = transformation_matrix[:3, :3]
+                    rvf = numpy.einsum('ij, kj -> ki',
+                                        R, field_values)
+                    cf_dict.update({field_name: rvf})
+                elif len(field_values.shape) == 3:   # TENSOR
+                    # get rotation
+                    R = transformation_matrix[:3, :3]
+                    rtf = numpy.einsum('ij, kjm, nm -> kin',
+                                       R, field_values, R)
+                    cf_dict.update({field_name: rtf})         
+ 
+ 
     def merge(self, other):
         pass
