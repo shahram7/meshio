@@ -118,6 +118,9 @@ meshio_to_abaqus_type = {
 # error messages
 ERROR_NO_ODBObject = '{} is no valid ODB object, please pass one of the ' \
                      + 'following: <odb>, <ODBAssembly>, <ODBInstance>'
+ERROR_NO_MDBObject = '{} is no valid MDB object, please pass one of the ' \
+                     + 'following: <Part>, <PartInstance>, <Assembly>, ' \
+                     + '<Model>'
 ERROR_NO_FIELD_DATA = 'field output {} has no values in  ' \
                     + 'instance {}'
 ERROR_ELSET_FIELD = 'field output {} is not defined on every element of ' \
@@ -206,26 +209,24 @@ def __reshape_fieldOutputs(cell_data_field, allocation):
 
 
 def convertMDBtoMeshio(mdbObject, **kwargs):
-    '''
+    """
+    convertMDBtoMeshio(mdbObject, **kwargs)
+
     This function converts geometry information stored in Abaqus model database
-    (mdb) to a meshio compatible representation
+    (mdb) to a meshio compatible representation.
 
-    Three different inputs can be passed and processed:
-
-    a part object, defined in the 'Part' module (mdb.parts)
-        * mdbObject: an Abaqus Part object (<type 'Part'>)
-    an instance of an part object, defined in the 'Assembly' module
-    (mdb.rootAssembly.instances)
-        * mdbObject: an Abaqus PartInstance object (<type 'PartInstance'>)
-    the entire assmebly of the model, containing several PartInstances
-        * mdbObject: an Abaqus Assembly Object (<type 'Assembly'>)
+    Parameters:
+    ----------
+    mdbObject : <'Part'> or <'PartInstance'> or <'Assembly'> or <'Model'>
+        <'Part'> is defined on mdb.parts, whereas <'PartInstance'> is defined
+        on the assembly level, <'Assembly'> may contain several part instance.
+        When type <'Model'> is passed, its <'Assembly'> mebber is processed
 
     Returns
     -------
     Mesh : meshio Mesh object
-        ready to write meshio Mesh object
-    '''
-
+        ready to write meshio Mesh objects
+    """
     def convertInstance(mdbInstance, idx_shift=0):
 
         inst = mdbInstance
@@ -290,10 +291,34 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
             cell_data = __merge_numpy_dicts(cell_data, cell_data_)
             idx_shift += len(points_)
 
+    else:
+        raise TypeError(ERROR_NO_MDBObject.format(mdbObject))
+
     return mo.Mesh(points, cells, cell_data=cell_data)
 
 
 def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
+    """
+    convertODBtoMeshio(mdbObject, frame, list_of_outputs=None, **kwargs)
+
+    This function converts geometry and result dat information stored in
+    Abaqus Outbut database (odb) to a meshio compatible representation.
+
+    Parameters:
+    ----------
+    odbObject : <'OdbInstance'> or <'OdbSet'> or <'OdbAssembly'> or <'odb'>
+        <'OdbInstance'> is defined on odb.rootAssembly.instances, argument of
+        type <'OdbSet'> must be an element Set as a member of an
+        <'OdbInstance'> odject. <'OdbAssembly'> is the entire assembly
+        containing several odbInstances and <'odb'> is the entire database
+    frame: <'OdbFrame>'
+        the frame containing the displacementField of the desire
+
+    Returns
+    -------
+    Mesh : meshio Mesh object
+        ready to write meshio Mesh objects
+    """
 
     def convertInstance(odbInstance, frame, idx_shift=0,
                         list_of_outputs=None):
@@ -504,6 +529,26 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
 
 
 def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
+    """
+    This function creates a new part in the selected model data base from
+    the geometry information stored in a meshio Mesh object
+
+    an OdbInstance object, defined in the 'rootAssembly' section
+    (odb.rootAssembly.instances)
+        * odbObject: an Abaqus OdbInstance object (<type 'OdbInstance'>)
+    an elementSet of an OdbInstance object, defined in its ElementSet section
+    (odbInstance.elementSets)
+        * odbObject: an Abaqus OdbSet object (<type 'OdbSet'>)
+    the entire assmebly of the model, containing several OdbInstances
+        * odbObject: an Abaqus OdbAssembly Object (<type 'OdbAssembly'>)
+    the entire Output Database
+        * odbObject: an Abaqus OutputDataBase (<type 'Odb'>)
+
+    Returns
+    -------
+    Mesh : meshio Mesh object
+        ready to write meshio Mesh object
+    """
     print("Warning: only the geometry of the mesh can be converted to ABAQUS´"
           + "model database. Information on field data is lost.")
     assert type(mesh) == mo.mesh.Mesh, 'No meshio Mesh instance'
@@ -536,9 +581,10 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
     i = 0
     while partname in partnames:
         if i == 0:
-            print('Warning: a part named {} is already in model {}.'.format(partname, modelname))
+            print('Warning: a part named {} is ' /
+                  'already in model {}.'.format(partname, modelname))
         partname += '_{}'.format(i)
-        i+=1
+        i += 1
 
     model.PartFromNodesAndElements(name=partname, dimensionality=THREE_D,
                                    type=DEFORMABLE_BODY, nodes=nodeData,
@@ -681,7 +727,6 @@ def convertMeshioToODB(mesh, odbname='test',
                                      data=[x.tolist() for x in element_data])
             else:
                 print('ERROR processing element output {}'.format(ed_name))
-
 
     pathToODB = odb.path
     odb.save()
