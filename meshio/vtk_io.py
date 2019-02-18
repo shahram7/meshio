@@ -10,6 +10,13 @@ from .__about__ import __version__
 from .mesh import Mesh
 from .common import raw_from_cell_data
 
+def __reshape_TENSOR_3D_FULL(value):
+    v = value
+    tens = numpy.array([[v[0], v[3], v[4]],
+                        [v[4], v[1], v[5]],
+                        [v[4], v[5], v[2]]])
+    return tens
+
 
 # https://www.vtk.org/doc/nightly/html/vtkCellType_8h_source.html
 vtk_to_meshio_type = {
@@ -397,7 +404,7 @@ def write(filename, mesh, write_binary=True, encoding='utf-8'):
 
     if not write_binary:
         logging.warning("VTK ASCII files are only meant for debugging.")
-        
+
     if not write_binary:
         with open(filename, "w") as f:
             f.write("# vtk DataFile Version 4.2\n")
@@ -552,14 +559,20 @@ def _write_field_data(f, data, write_binary):
                 len(values.shape) in [2,3]
             ), "Only one and two-dimensional field data supported."
             num_tuples = values.shape[0]
-            if len(values.shape) == 2:
+            if len(values.shape) == 2 and values.shape[-1] == 3:
                 num_components = values.shape[1]
                 field_value_type = 'VECTORS'
+            elif len(values.shape) == 2 and values.shape[-1] == 6:
+                field_value_type = 'TENSORS'
+                values = numpy.array([__reshape_TENSOR_3D_FULL(x) for x in values])
+                num_components = values.shape[1]*values.shape[2]
+                num_dim = values.shape[1]
             else:
                 num_components = values.shape[1]*values.shape[2]
                 num_dim = values.shape[1]
                 field_value_type = 'TENSORS'
 
+        print(field_value_type, name)
         if " " in name:
             logging.warning(
                 "VTK doesn't support spaces in field names. " 'Renaming "%s" to "%s".',
@@ -592,7 +605,7 @@ def _write_field_data(f, data, write_binary):
         if field_value_type == 'SCALARS':
                 f.write("LOOKUP_TABLE default\n").  encode("utf-8")
         if field_value_type == 'TENSORS':
-            values = values.reshape(num_tuples*num_dim, num_dim) #achieve order
+            values = values.reshape(num_tuples*num_dim, num_dim)  # order
         if write_binary:
             for value in values:
                 value.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
