@@ -95,14 +95,14 @@ class Mesh(object):
             self.cells[key] = all_cells_flat[k : k + n].reshape(s)
             k += n
         return
-        
+
     def transform(self, transformation_matrix):
         # transform node coordinates
         homgenous_points = numpy.c_[self.points, numpy.ones(len(self.points))]
         self.points = numpy.einsum('ij,kj -> ki',
                                     transformation_matrix,
                                     homgenous_points)[:,:3]
-        
+
         # transform node fields
         for field_name, field_values in self.point_data.items():
             if len(field_values.shape) == 1:  # SCALAR
@@ -119,7 +119,7 @@ class Mesh(object):
                 rtf = numpy.einsum('ij, kjm, nm -> kin',
                                    R, field_values, R)
                 self.point_data.update({field_name: rtf})
-                
+
         # transform cell fields
         for etype, cf_dict in self.cell_data.items():
             for field_name, field_values in cf_dict.items():
@@ -136,34 +136,34 @@ class Mesh(object):
                     R = transformation_matrix[:3, :3]
                     rtf = numpy.einsum('ij, kjm, nm -> kin',
                                        R, field_values, R)
-                    cf_dict.update({field_name: rtf})         
- 
- 
+                    cf_dict.update({field_name: rtf})
+
+
     def merge(self, other):
         from copy import copy
         points1 = copy(self.points)
         cells1 = copy(self.cells)
         point_data1 = copy(self.point_data)
         cell_data1 = copy(self.cell_data)
-        
+
         points2 = copy(other.points)
         cells2 = copy(other.cells)
         point_data2 = copy(other.point_data)
         cell_data2 = copy(other.cell_data)
-        
+
         # assert(point_data1.keys() == point_data2.keys())
-        
+
         # merge points
         merged_points = numpy.r_[points1, points2]
         # update labels
         for cell_type, cells in cells2.items():
-            cells2[cell_type] = len(points1) + cells 
-        
+            cells2[cell_type] = len(points1) + cells
+
         # merge cells
         merged_cells = {}
-        etypes1 = cells1.keys() 
+        etypes1 = cells1.keys()
         etypes2 = cells2.keys()
-             
+
         # merge cell data
         for etype1 in etypes1:
             if etype1 in etypes2:
@@ -172,17 +172,17 @@ class Mesh(object):
             else:
                 # element types only in self
                 merged_cells.update({etype1: cells1[etype1]})
-               
+
         for etype2 in etypes2:
             # element types only in other
             if etype2 not in etypes1:
                 merged_cells.update({etype2: cells2[etype2]})
-                
+
          # merge point_data
         merged_point_data = {}
         assert point_data1.keys() == point_data2.keys()
         for field_name in point_data1.keys():
             mpd = np.r_[point_data1[field_name], point_data2[field_name]]
             merged_point_data[field_name] = mpd
-                
+
         return Mesh(merged_points, merged_cells, merged_point_data)
