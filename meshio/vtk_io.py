@@ -6,9 +6,9 @@ I/O for VTK <https://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>.
 import logging
 import numpy
 
-from .__about__ import __version__
 from .mesh import Mesh
 from .common import raw_from_cell_data
+
 
 def __reshape_TENSOR_3D_FULL(value):
     v = value
@@ -114,8 +114,7 @@ numpy_to_vtk_dtype = {v: k for k, v in vtk_to_numpy_dtype_name.items()}
 
 
 def read(filename):
-    """Reads a VTK file.
-    """
+    """Reads a VTK file."""
     with open(filename, "rb") as f:
         out = read_buffer(f)
     return out
@@ -133,7 +132,7 @@ def read_buffer(f):
     f.readline()
 
     data_type = f.readline().decode("utf-8").strip()
-    assert data_type in ["ASCII", "BINARY"], "Unknown VTK data type '{}'.".format(
+    assert data_type in ["ASCII", "BINARY"], "Unknown data type '{}'.".format(
         data_type
     )
     is_ascii = data_type == "ASCII"
@@ -479,9 +478,8 @@ def _write_points(f, points, write_binary):
         points.astype(points.dtype.newbyteorder(">")).tofile(f, sep="")
     else:
         for point in points:
-            point.tofile(f,sep= ' ')
+            point.tofile(f, sep=" ")
             f.write('\n')
-        #points.tofile(f, sep=" ")
     if write_binary:
         f.write("\n".encode("utf-8"))
     else:
@@ -572,10 +570,10 @@ def _write_field_data(f, data, write_binary):
                 num_dim = values.shape[1]
                 field_value_type = 'TENSORS'
 
-        print(field_value_type, name)
         if " " in name:
             logging.warning(
-                "VTK doesn't support spaces in field names. " 'Renaming "%s" to "%s".',
+                "VTK doesn't support spaces in field names. "
+                "Renaming '%s' to '%s'.",
                 name,
                 name.replace(" ", "_"),
             )
