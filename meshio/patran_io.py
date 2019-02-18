@@ -31,7 +31,7 @@ pat_to_meshio_type = {
 meshio_to_pat_type = {v: k for k, v in pat_to_meshio_type.items()}
 
 
-def read(filename, ele_filename=None, nod_filename=None):
+def read(filename, ele_filename=None, nod_filename=None, scale=1.0):
     """Read a Patran *.pat file.
 
     If a *.ele file or *.nod file is provided or if it has the same name as
@@ -45,9 +45,11 @@ def read(filename, ele_filename=None, nod_filename=None):
         ele_filename (str, optional): element-wise data file
 
         nod_filename (str, optional): node-wise data file.
+
+        scale (float): scale factor for nodes
     """
     with open(filename, "r") as f:
-        mesh, element_gids, point_gids = read_pat_buffer(f)
+        mesh, element_gids, point_gids = read_pat_buffer(f, scale)
 
     # if *.ele file is present: Add cell data
     ele_filename = ele_filename or filename.replace('.pat', '.ele')
@@ -116,7 +118,7 @@ def read_nod_buffer(f, mesh, point_gids):
     return mesh
 
 
-def read_pat_buffer(f):
+def read_pat_buffer(f, scale):
     # Initialize the optional data fields
     cells = {}
     points = []
@@ -131,7 +133,7 @@ def read_pat_buffer(f):
 
         card_data = line.split()
         if line.startswith(" 1"):
-            points.append(_read_node(f))
+            points.append(_read_node(f, scale))
             point_gids.append(int(card_data[1]))
         elif line.startswith(" 2"):
             lnodes = _read_cell(f)
@@ -151,7 +153,7 @@ def read_pat_buffer(f):
     return Mesh(points, cells), element_gids, point_gids
 
 
-def _read_node(f):
+def _read_node(f, scale):
     """Read a node card.
 
     The node card contains the following:
@@ -164,7 +166,7 @@ def _read_node(f):
     """
     line = f.readline()
     entries = [line[i:i+16] for i in range(0, len(line), 16)]
-    point = [float(coordinate) for coordinate in entries[:-1]]
+    point = [scale*float(coordinate) for coordinate in entries[:-1]]
     f.readline()
     return point
 
