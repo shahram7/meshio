@@ -246,6 +246,7 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
         # type
         # firstly, we create an empty dict for storing the cell informations
         cells = {}
+        cell_data = {}
 
         # loop over all elements
         for elem in elements:
@@ -255,21 +256,25 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
             etype = abaqus_to_meshio_type[str(elem.type)]
             if etype in cells.keys():
                 cells[etype].append(con)
+                cell_data[etype]['ID'] = np.append(cell_data[etype]['ID'],
+                                                   elem.label)
             else:
                 # create a new key for a new element set
                 cells[etype] = [con]
+                cell_data[etype] = {'ID': np.array([elem.label])}
 
         cells.update((key, np.array(cons)) for key, cons in cells.items())
-        return points, cells
+        return points, cells, cell_data
 
     # if an Part or PartInstance is passed, call convertInstance once
     if str(type(mdbObject)) in ["<type 'Part'>", "<type 'PartInstance'>"]:
-        points, cells = convertInstance(mdbObject)
+        points, cells, cell_data = convertInstance(mdbObject)
 
     # if an Assembly Object or a Model Object is passed, loop over
     # all instances
     elif str(type(mdbObject)) in ["<type 'Assembly'>", "<type 'Model'>"]:
         cells = {}
+        cell_data = {}
         points = np.empty((0, 3))
         if str(type(mdbObject)) == "<type 'Model'>":
             rA = mdbObject.rootAssembly
@@ -279,12 +284,13 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
         idx_shift = 0
         for inst_name in rA.instances.keys():
             inst = rA.instances[inst_name]
-            points_, cells_ = convertInstance(inst, idx_shift)
+            points_, cells_, cell_data_ = convertInstance(inst, idx_shift)
             points = np.vstack((points, points_))
             cells = __merge_numpy_dicts(cells, cells_)
+            cell_data = __merge_numpy_dicts(cell_data, cell_data_)
             idx_shift += len(points_)
 
-    return mo.Mesh(points, cells)
+    return mo.Mesh(points, cells, cell_data=cell_data)
 
 
 def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
@@ -541,19 +547,19 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
 
 def convertMeshioToODB(mesh, odbname='test',
                        filename='test.odb', **kwargs):
-    
+
     all_points = mesh.points
     n_points = len(all_points)
     all_elements = mesh.cells
     all_node_data = mesh.point_data
     all_element_data = mesh.cell_data
-    
+
     # creat a new odb
     odb = Odb(name=odbname,
               analysisTitle='ODB created from Meshio Instance',
               description='ODB created from Mesio Instance',
               path=filename)
-    
+
     # add section
     sCat = odb.SectionCategory(name='S5',
                                description='Five-Layered Shell')
@@ -663,7 +669,7 @@ def convertMeshioToODB(mesh, odbname='test',
                                      data=[x.tolist() for x in element_data])
             elif field_type == TENSOR_3D_FULL:
                 # assume symmetry, keep only the relevant components,
-                # reshape to abaqus order 
+                # reshape to abaqus order
                 element_data = [x.flatten()[[0, 4, 8, 1, 2, 5]]
                                 for x in element_data]
                 currentField.setComponentLabels(('11', '22', '33',
