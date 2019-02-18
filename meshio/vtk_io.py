@@ -590,8 +590,6 @@ def _write_field_data(f, data, write_binary):
                     )
                 )
             )
-            if field_value_type == 'SCALARS':
-                f.write("LOOKUP_TABLE default\n")
         else:
             f.write(
                 (
