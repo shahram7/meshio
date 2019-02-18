@@ -118,6 +118,9 @@ meshio_to_abaqus_type = {
 # error messages
 ERROR_NO_ODBObject = '{} is no valid ODB object, please pass one of the ' \
                      + 'following: <odb>, <ODBAssembly>, <ODBInstance>'
+ERROR_NO_MDBObject = '{} is no valid MDB object, please pass one of the ' \
+                     + 'following: <Part>, <PartInstance>, <Assembly>, ' \
+                     + '<Model>'
 ERROR_NO_FIELD_DATA = 'field output {} has no values in  ' \
                     + 'instance {}'
 ERROR_ELSET_FIELD = 'field output {} is not defined on every element of ' \
@@ -283,6 +286,9 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
             points = np.vstack((points, points_))
             cells = __merge_numpy_dicts(cells, cells_)
             idx_shift += len(points_)
+
+    else:
+        raise TypeError(ERROR_NO_MDBObject.format(mdbObject))
 
     return mo.Mesh(points, cells)
 
@@ -541,19 +547,19 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
 
 def convertMeshioToODB(mesh, odbname='test',
                        filename='test.odb', **kwargs):
-    
+
     all_points = mesh.points
     n_points = len(all_points)
     all_elements = mesh.cells
     all_node_data = mesh.point_data
     all_element_data = mesh.cell_data
-    
+
     # creat a new odb
     odb = Odb(name=odbname,
               analysisTitle='ODB created from Meshio Instance',
               description='ODB created from Mesio Instance',
               path=filename)
-    
+
     # add section
     sCat = odb.SectionCategory(name='S5',
                                description='Five-Layered Shell')
@@ -663,7 +669,7 @@ def convertMeshioToODB(mesh, odbname='test',
                                      data=[x.tolist() for x in element_data])
             elif field_type == TENSOR_3D_FULL:
                 # assume symmetry, keep only the relevant components,
-                # reshape to abaqus order 
+                # reshape to abaqus order
                 element_data = [x.flatten()[[0, 4, 8, 1, 2, 5]]
                                 for x in element_data]
                 currentField.setComponentLabels(('11', '22', '33',
