@@ -607,13 +607,12 @@ def _write_field_data(f, data, write_binary):
         if field_value_type == 'TENSORS':
             values = values.reshape(num_tuples*num_dim, num_dim)  # order
         if write_binary:
-            for value in values:
-                value.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
+            values.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
         else:
             # ascii
-            #values.tofile(f, sep=" ")
+            # values.tofile(f, sep=" ")
             for value in values:
-                value.tofile(f, sep= ' ')
+                value.tofile(f, sep=" ")
                 f.write('\n')
             # numpy.savetxt(f, points)
     if write_binary:
