@@ -31,21 +31,34 @@ pat_to_meshio_type = {
 meshio_to_pat_type = {v: k for k, v in pat_to_meshio_type.items()}
 
 
-def read(filename):
-    """Read a Patran *.pat file."""
+def read(filename, ele_filename=None, nod_filename=None):
+    """Read a Patran *.pat file.
+
+    If a *.ele file or *.nod file is provided or if it has the same name as
+    the *.pat file, these files are used to fill data fields. Such files are
+    exported by Modlflow for example.
+
+    Args
+    ----
+        filename (str): Patran filename that should be read
+
+        ele_filename (str, optional): element-wise data file
+
+        nod_filename (str, optional): node-wise data file.
+    """
     with open(filename, "r") as f:
         mesh, element_gids, point_gids = read_pat_buffer(f)
 
     # if *.ele file is present: Add cell data
-    data_filename = filename.replace('.pat', '.ele')
-    if os.path.isfile(data_filename):
-        with open(data_filename, "r") as f:
+    ele_filename = ele_filename or filename.replace('.pat', '.ele')
+    if os.path.isfile(ele_filename):
+        with open(ele_filename, "r") as f:
             mesh = read_ele_buffer(f, mesh, element_gids)
 
     # if *.nod file is present: Add point data
-    data_filename = filename.replace('.pat', '.nod')
-    if os.path.isfile(data_filename):
-        with open(data_filename, "r") as f:
+    nod_filename = nod_filename or filename.replace('.pat', '.nod')
+    if os.path.isfile(nod_filename):
+        with open(nod_filename, "r") as f:
             mesh = read_nod_buffer(f, mesh, point_gids)
 
     return mesh
