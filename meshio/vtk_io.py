@@ -96,7 +96,7 @@ vtk_to_numpy_dtype_name = {
     "unsigned_short": "uint16",
     "short": "int16",
     "unsigned_int": "uint32",
-    "int": numpy.dtype("int32"),
+    "int": "int32",
     "unsigned_long": "int64",
     "long": "int64",
     "float": "float32",
@@ -397,7 +397,7 @@ def write(filename, mesh, write_binary=True, encoding='utf-8'):
 
     if not write_binary:
         logging.warning("VTK ASCII files are only meant for debugging.")
-        
+
     if not write_binary:
         with open(filename, "w") as f:
             f.write("# vtk DataFile Version 4.2\n")
@@ -590,7 +590,7 @@ def _write_field_data(f, data, write_binary):
                 ).encode("utf-8")
             )
         if field_value_type == 'SCALARS':
-                f.write("LOOKUP_TABLE default\n").  encode("utf-8")
+                f.write(("LOOKUP_TABLE default\n").encode("utf-8"))
         if field_value_type == 'TENSORS':
             values = values.reshape(num_tuples*num_dim, num_dim) #achieve order
         if write_binary:
