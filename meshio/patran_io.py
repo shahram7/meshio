@@ -68,28 +68,31 @@ def read(filename, ele_filename=None, nod_filename=None, scale=1.0):
 
 def read_ele_buffer(f, mesh, element_gids):
     """Read element based data file."""
-    elem_id_map = {}
-    for line, id in enumerate(element_gids):
-        elem_id_map[id] = line
 
     name = f.readline().replace(' ', '_').rstrip('\n')
     dimensions = f.readline().split()
     N = int(dimensions[0])
-    order = int(dimensions[-1])
     f.readline()
 
-    array = numpy.zeros([N, order])
+    data = {}
 
     for i in range(N):
         line = f.readline().split()
         ID = int(line[0])
         values = map(float, line[1:])
-        line = elem_id_map[ID]
-        array[line, :] = values
+        data[ID] = numpy.array(values)
 
-    shape_codes = mesh.cells.keys()
-    arbitrary_shape_code = shape_codes[0]
-    mesh.cell_data = {arbitrary_shape_code: {name: array}}
+    for elem_type in mesh.cells.keys():
+        for gid in element_gids[elem_type]:
+            try:
+                values = data[gid]
+                if elem_type in mesh.cell_data.keys():
+                    mesh.cell_data[elem_type][name].append(values)
+                else:
+                    mesh.cell_data[elem_type] = {name: [values]}
+            except KeyError:
+                print("No data attached to Element %d" % gid)
+
     return mesh
 
 
@@ -123,7 +126,7 @@ def read_pat_buffer(f, scale):
     cells = {}
     points = []
     point_gids = []
-    element_gids = []
+    element_gids = {}
 
     while True:
         line = f.readline()
@@ -137,13 +140,17 @@ def read_pat_buffer(f, scale):
             point_gids.append(int(card_data[1]))
         elif line.startswith(" 2"):
             lnodes = _read_cell(f)
-            element_gids.append(int(card_data[1]))
             shape_code = int(card_data[2])
             key = pat_to_meshio_type[shape_code]
             if key in cells:
                 cells[key] = numpy.vstack((cells[key], lnodes))
+                element_gids[key].append(int(card_data[1]))
             else:
                 cells[key] = lnodes
+                element_gids[key] = [int(card_data[1])]
+        elif line.startswith(" 4"):
+            # do not read cross section properties.
+            junk = f.readline()
 
     points = numpy.array(points, dtype=float)
     point_gids = numpy.array(point_gids, dtype=int)
@@ -186,6 +193,7 @@ def _read_cell(f):
     f.readline()
     entries = f.readline().split()
     lnodes = map(int, entries)
+    lnodes = numpy.trim_zeros(lnodes)
     return numpy.array(lnodes)
 
 
