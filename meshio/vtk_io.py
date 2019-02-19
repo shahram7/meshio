@@ -10,6 +10,7 @@ from .__about__ import __version__
 from .mesh import Mesh
 from .common import raw_from_cell_data
 
+
 def __reshape_TENSOR_3D_FULL(value):
     v = value
     tens = numpy.array([[v[0], v[3], v[4]],
@@ -572,7 +573,6 @@ def _write_field_data(f, data, write_binary):
                 num_dim = values.shape[1]
                 field_value_type = 'TENSORS'
 
-        print(field_value_type, name)
         if " " in name:
             logging.warning(
                 "VTK doesn't support spaces in field names. " 'Renaming "%s" to "%s".',
@@ -603,7 +603,7 @@ def _write_field_data(f, data, write_binary):
                 ).encode("utf-8")
             )
         if field_value_type == 'SCALARS':
-                f.write("LOOKUP_TABLE default\n").  encode("utf-8")
+                f.write("LOOKUP_TABLE default\n").encode("utf-8")
         if field_value_type == 'TENSORS':
             values = values.reshape(num_tuples*num_dim, num_dim)  # order
         if write_binary:

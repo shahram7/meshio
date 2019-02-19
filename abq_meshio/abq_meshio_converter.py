@@ -647,6 +647,8 @@ def convertMeshioToODB(mesh, odbname='test',
             field_type = SCALAR
         elif shape == (n_points, 3):
             field_type = VECTOR
+        elif shape == (n_points, 3, 3):
+            field_type = TENSOR_3D_FULL
         else:
             print('only scalar and vector data is supported atm')
             continue
@@ -655,8 +657,8 @@ def convertMeshioToODB(mesh, odbname='test',
                                            description='{}'.format(nd_name),
                                            type=field_type)
         if field_type == SCALAR:
-            newField.addData(position=CENTROID, instance=odb_inst,
-                             labels=element_labels_LU[etype],
+            newField.addData(position=NODAL, instance=odb_inst,
+                             labels=node_labels,
                              data=[[x] for x in node_data])
 
         elif field_type == VECTOR:
@@ -664,6 +666,18 @@ def convertMeshioToODB(mesh, odbname='test',
             newField.setValidInvariants((MAGNITUDE, ))
             newField.addData(position=NODAL, instance=odb_inst,
                              labels=node_labels, data=node_data)
+        elif field_type == TENSOR_3D_FULL:
+            # assume symmetry, keep only the relevant components,
+            # reshape to abaqus order
+            node_data = [x.flatten()[[0, 4, 8, 1, 2, 5]]
+                         for x in node_data]
+            newField.setComponentLabels(('11', '22', '33',
+                                         '12', '13', '23'))
+            newField.setValidInvariants((MISES, TRESCA, PRESS,
+                                         INV3, MAX_PRINCIPAL))
+            newField.addData(position=NODAL, instance=odb_inst,
+                             labels=node_labels,
+                             data=[x.tolist() for x in node_data])
         else:
             print('ERROR processing node output {}'.format(nd_name))
 
