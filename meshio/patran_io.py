@@ -141,14 +141,14 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
             for gid in element_gids[elem_type]:
                 try:
                     values = data[gid]
-                    if elem_type in mesh.cell_data.keys():
+                    if name in mesh.cell_data[elem_type].keys():
                         mesh.cell_data[elem_type][name].append(values)
                     else:
                         mesh.cell_data[elem_type] = {name: [values]}
                 except KeyError:
                     print("No data attached to Element %d. Writing NaN." % gid)
                     values = numpy.nan*numpy.ones(order)
-                    if elem_type in mesh.cell_data.keys():
+                    if name in mesh.cell_data[elem_type].keys():
                         mesh.cell_data[elem_type][name].append(values)
                     else:
                         mesh.cell_data[elem_type] = {name: [values]}
