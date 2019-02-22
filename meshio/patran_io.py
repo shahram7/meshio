@@ -20,33 +20,41 @@ import numpy
 from .mesh import Mesh
 
 pat_to_meshio_type = {
-        2: "line",
-        3: "triangle",
-        4: "quad",
-        5: "tetra",
-        7: "wedge",
-        8: "hexa_prism",
-        9: "pyramid",
+    2: "line",
+    3: "triangle",
+    4: "quad",
+    5: "tetra",
+    7: "wedge",
+    8: "hexa_prism",
+    9: "pyramid",
 }
 meshio_to_pat_type = {v: k for k, v in pat_to_meshio_type.items()}
 
 
-def read(filename, ele_filename=None, nod_filename=None, scale=1.0):
+def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
+         scale=1.0):
     """Read a Patran *.pat file.
 
-    If a *.ele file or *.nod file is provided or if it has the same name as
-    the *.pat file, these files are used to fill data fields. Such files are
-    exported by Modlflow for example.
+    If a *.ele file, *.xml file or *.nod file is provided or if it has the
+    same name as the *.pat file, these files are used to fill data fields.
+    Such files are exported by Modlflow for example.
 
     Args
     ----
-        filename (str): Patran filename that should be read
+        filename : str
+            Patran filename that should be read
 
-        ele_filename (str, optional): element-wise data file
+        ele_filename : str, optional
+            element-wise data file
 
-        nod_filename (str, optional): node-wise data file.
+        nod_filename : str, optional
+            node-wise data file.
 
-        scale (float): scale factor for nodes
+        xml_filename : str, optional
+            element-wise data file
+
+        scale : float
+            scale factor for nodes
     """
     with open(filename, "r") as f:
         mesh, element_gids, point_gids = read_pat_buffer(f, scale)
@@ -56,6 +64,11 @@ def read(filename, ele_filename=None, nod_filename=None, scale=1.0):
     if os.path.isfile(ele_filename):
         with open(ele_filename, "r") as f:
             mesh = read_ele_buffer(f, mesh, element_gids)
+
+    # if *.xml file is present: Add cell or node data
+    xml_filename = xml_filename or filename.replace('.pat', '.xml')
+    if os.path.isfile(xml_filename):
+        mesh = read_xml_buffer(xml_filename, mesh, element_gids, point_gids)
 
     # if *.nod file is present: Add point data
     nod_filename = nod_filename or filename.replace('.pat', '.nod')
@@ -72,6 +85,7 @@ def read_ele_buffer(f, mesh, element_gids):
     name = f.readline().replace(' ', '_').rstrip('\n')
     dimensions = f.readline().split()
     N = int(dimensions[0])
+    order = int(dimensions[-1])
     f.readline()
 
     data = {}
@@ -91,8 +105,70 @@ def read_ele_buffer(f, mesh, element_gids):
                 else:
                     mesh.cell_data[elem_type] = {name: [values]}
             except KeyError:
-                print("No data attached to Element %d" % gid)
+                print("No data attached to Element %d. Writing NaN." % gid)
+                values = numpy.nan*numpy.ones(order)
+                if elem_type in mesh.cell_data.keys():
+                    mesh.cell_data[elem_type][name].append(values)
+                else:
+                    mesh.cell_data[elem_type] = {name: [values]}
 
+    return mesh
+
+
+def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
+    """Read element based data file."""
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(xml_filename)
+    root = tree.getroot()
+
+    data = {}
+
+    dataset = root.find('Dataset')
+    type = dataset.find('DataType').text
+    order = int(dataset.find('NumberOfComponents').text)
+    name = dataset.find('DeptVar').get('Name').replace(' ', '_').rstrip('\n')
+    blocks = dataset.find('Blocks')
+
+    for item in blocks.find('Block').find('Data'):
+        ID = int(item.get('ID'))
+        line = item.find('DeptValues').text
+        values = map(float, line.split())
+        data[ID] = numpy.array(values)
+
+    if "ELDT" in type:
+        for elem_type in mesh.cells.keys():
+            for gid in element_gids[elem_type]:
+                try:
+                    values = data[gid]
+                    if elem_type in mesh.cell_data.keys():
+                        mesh.cell_data[elem_type][name].append(values)
+                    else:
+                        mesh.cell_data[elem_type] = {name: [values]}
+                except KeyError:
+                    print("No data attached to Element %d. Writing NaN." % gid)
+                    values = numpy.nan*numpy.ones(order)
+                    if elem_type in mesh.cell_data.keys():
+                        mesh.cell_data[elem_type][name].append(values)
+                    else:
+                        mesh.cell_data[elem_type] = {name: [values]}
+
+    elif "NDDT" in type:
+        for gid in point_gids:
+            try:
+                if name in mesh.point_data.keys():
+                    mesh.point_data[name] = numpy.vstack(
+                        (mesh.point_data[name], data[gid]))
+                else:
+                    mesh.point_data = {name: data[gid]}
+            except KeyError:
+                print("No data attached to Point %d. Writing NaN." % gid)
+                values = numpy.nan*numpy.ones(order)
+                if name in mesh.point_data.keys():
+                    mesh.point_data[name] = numpy.vstack(
+                        (mesh.point_data[name], values))
+                else:
+                    mesh.point_data = {name: values}
     return mesh
 
 
@@ -108,7 +184,7 @@ def read_nod_buffer(f, mesh, point_gids):
     order = int(dimensions[-1])
     f.readline()
 
-    array = numpy.zeros([N, order])
+    array = numpy.nan*numpy.ones([N, order])
 
     for i in range(N):
         line = f.readline().split()
@@ -122,6 +198,7 @@ def read_nod_buffer(f, mesh, point_gids):
 
 
 def read_pat_buffer(f, scale):
+    """Read Patran geometry file."""
     # Initialize the optional data fields
     cells = {}
     points = []
@@ -172,8 +249,8 @@ def _read_node(f, scale):
     === ===== === ====== === ===
     """
     line = f.readline()
-    entries = [line[i:i+16] for i in range(0, len(line), 16)]
-    point = [scale*float(coordinate) for coordinate in entries[:-1]]
+    entries = [line[i:i + 16] for i in range(0, len(line), 16)]
+    point = [scale * float(coordinate) for coordinate in entries[:-1]]
     f.readline()
     return point
 
