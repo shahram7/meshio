@@ -6,7 +6,9 @@ Created on Fri Jan 25 18:04:22 2019
 """
 
 import numpy as np
+import numpy.linalg as la
 import meshio as mo
+from time import time
 
 reload(mo)
 
@@ -313,7 +315,6 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
     Mesh : meshio Mesh object
         ready to write meshio Mesh objects
     """
-
     def convertInstance(odbInstance, frame, idx_shift=0,
                         list_of_outputs=None):
 
@@ -402,11 +403,12 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
         n_nodes = len(nodes)
         n_elements = len(elements)
         # get node informations and coordinates
-        node_labels, points = zip(*[(value.nodeLabel, value.data +
-                                     nLU(value.nodeLabel).coordinates)
-                                  for value in disp_values])
-
-        points = np.array(points)
+        node_labels, disp, x0 = zip(*[(value.nodeLabel, value.data,
+                                      nLU(value.nodeLabel).coordinates)
+                                      for value in disp_values])
+        x0 = np.array(x0)
+        disp = np.array(disp)
+        points = disp + x0
 
         # create a lookup table to connect node labels and their array index
         nodeLU = {key: value for (key, value) in zip(node_labels,
@@ -437,7 +439,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
         # if field data is requested
         if list_of_outputs:
             for field_name in list_of_outputs:
-                if type(field_name) == str:
+                if type(field_name) == str and not field_name.lower().startswith('fdir'):
                     fO = frame.fieldOutputs[field_name]
                     fO = fO.getSubset(region=inst)
                     n_values = len(fO.values)
@@ -487,8 +489,68 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
                             for fn in set(new_field_names):
                                 del cd_dict[fn]
 
+        if 'FDIR1' in list_of_outputs or 'FDIR2' in list_of_outputs:
+            # get initial fiber orientation from stress field
+            stress = frame.fieldOutputs['S'].getSubset(region=eset)
+            csys = np.asarray(stress.values[0].localCoordSystem)
+            fdir1_0, fdir2_0 = csys[:2]
+
+            def _computeDeformationGradient(con):
+                """
+                compute the deformation gradient of the element
+                """
+                assert(len(con)) in [3, 4], ''
+                # coordinates in the initial configuration
+                x0_coords = np.array([x0[c] for c in con])
+                # coordinates in the current configuration
+                x1_coords = np.array([points[c] for c in con])
+
+                # compute the derivative of the iso-coordinates
+                if len(con) == 3:  # triangle
+                    B_xii = np.zeros((2, 3))
+                    B_xii[0] = [-1., 1., 0.]
+                    B_xii[1] = [-1., 0., 1.]
+                else:  # quad at midpoint
+                    B_xii = np.zeros((2, 4))
+                    B_xii[0] = [-.25, .25, .25, -.25]
+                    B_xii[1] = [-.25, -.25, .25, .25]
+                # compute the Jacobians
+                J_initial = np.dot(B_xii, x0_coords)
+                J_initial_inv = np.dot(la.inv(np.dot(J_initial, J_initial.T)),
+                                       J_initial)
+                J_current = np.dot(B_xii, x1_coords)
+                # compute F as product of the Jacobians
+                # (F maps from inital to current, via reference configuration )
+                F = np.dot(J_current.T, J_initial_inv)
+                return F
+
+            for etype, cell_con in cells.items():
+
+                def_grad = np.array([_computeDeformationGradient(con_idx)
+                                    for con_idx in cell_con])
+                if 'FDIR1' in list_of_outputs:
+                    fdir1 = np.einsum('ijk,k->ij', def_grad, fdir1_0)
+                    fdir1 = np.array([f_i/la.norm(f_i) for f_i in fdir1])
+                    try:
+                        cell_data[etype].update({'FDIR1': fdir1})
+                    except KeyError:
+                        cell_data[etype] = {'FDIR1': fdir1}
+                if 'FDIR2' in list_of_outputs:
+                    fdir2 = np.einsum('ijk,k->ij', def_grad, fdir2_0)
+                    fdir2 = np.array([f_i/la.norm(f_i) for f_i in fdir2])
+                    try:
+                        cell_data[etype].update({'FDIR2': fdir2})
+                    except KeyError:
+                        cell_data[etype] = {'FDIR2': fdir2}
+
+                try:
+                    cell_data[etype].update({'F': def_grad})
+                except KeyError:
+                    cell_data[etype] = {'F': def_grad}
+
         return points, cells, point_data, cell_data
 
+    tic = time()
     if str(type(odbObject)) in ["<type 'OdbInstance'>",
                                 "<type 'OdbSet'>"]:
         odbInstance = odbObject
@@ -518,7 +580,8 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
                 points = np.vstack((points, points_))
                 cells = __merge_numpy_dicts(cells, cells_)
                 idx_shift += len(points_)
-
+    toc = time()
+    print('took {} seconds'.format(toc-tic))
     return mo.Mesh(points, cells, point_data, cell_data)
 
 
@@ -683,9 +746,7 @@ def convertMeshioToODB(mesh, odbname='test',
 
     # write element data
     for etype, ed_dict in all_element_data.items():
-        print(etype)
         for ed_name, element_data in ed_dict.items():
-            print(ed_name)
             n_elements = len(element_data)
             shape = element_data.shape
             if shape == (n_elements, ):
