@@ -186,3 +186,16 @@ class Mesh(object):
             merged_point_data[field_name] = mpd
 
         return Mesh(merged_points, merged_cells, merged_point_data)
+
+    def add_cell_data(self, more_cell_data={}):
+        """Add cell_data to existing mesh."""
+        for etype in more_cell_data.keys():
+            for property in more_cell_data[etype].keys():
+                if property in self.cell_data[etype].keys():
+                    print("Property already exists.")
+                else:
+                    new_array = more_cell_data[etype][property]
+                    if len(new_array) == len(self.cells[etype]):
+                        self.cell_data[etype][property] = new_array
+                    else:
+                        print("Number of cells mismatch.")

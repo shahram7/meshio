@@ -6,7 +6,6 @@ I/O for VTK <https://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>.
 import logging
 import numpy
 
-from .__about__ import __version__
 from .mesh import Mesh
 from .common import raw_from_cell_data
 
@@ -104,7 +103,7 @@ vtk_to_numpy_dtype_name = {
     "unsigned_short": "uint16",
     "short": "int16",
     "unsigned_int": "uint32",
-    "int": numpy.dtype("int32"),
+    "int": "int32",
     "unsigned_long": "int64",
     "long": "int64",
     "float": "float32",
@@ -115,8 +114,7 @@ numpy_to_vtk_dtype = {v: k for k, v in vtk_to_numpy_dtype_name.items()}
 
 
 def read(filename):
-    """Reads a VTK file.
-    """
+    """Reads a VTK file."""
     with open(filename, "rb") as f:
         out = read_buffer(f)
     return out
@@ -134,7 +132,7 @@ def read_buffer(f):
     f.readline()
 
     data_type = f.readline().decode("utf-8").strip()
-    assert data_type in ["ASCII", "BINARY"], "Unknown VTK data type '{}'.".format(
+    assert data_type in ["ASCII", "BINARY"], "Unknown data type '{}'.".format(
         data_type
     )
     is_ascii = data_type == "ASCII"
@@ -480,9 +478,8 @@ def _write_points(f, points, write_binary):
         points.astype(points.dtype.newbyteorder(">")).tofile(f, sep="")
     else:
         for point in points:
-            point.tofile(f,sep= ' ')
+            point.tofile(f, sep=" ")
             f.write('\n')
-        #points.tofile(f, sep=" ")
     if write_binary:
         f.write("\n".encode("utf-8"))
     else:
@@ -575,7 +572,8 @@ def _write_field_data(f, data, write_binary):
 
         if " " in name:
             logging.warning(
-                "VTK doesn't support spaces in field names. " 'Renaming "%s" to "%s".',
+                "VTK doesn't support spaces in field names. "
+                "Renaming '%s' to '%s'.",
                 name,
                 name.replace(" ", "_"),
             )
@@ -590,8 +588,6 @@ def _write_field_data(f, data, write_binary):
                     )
                 )
             )
-            if field_value_type == 'SCALARS':
-                f.write("LOOKUP_TABLE default\n")
         else:
             f.write(
                 (
@@ -603,17 +599,16 @@ def _write_field_data(f, data, write_binary):
                 ).encode("utf-8")
             )
         if field_value_type == 'SCALARS':
-                f.write("LOOKUP_TABLE default\n").encode("utf-8")
+                f.write(("LOOKUP_TABLE default\n").encode("utf-8"))
         if field_value_type == 'TENSORS':
             values = values.reshape(num_tuples*num_dim, num_dim)  # order
         if write_binary:
-            for value in values:
-                value.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
+            values.astype(values.dtype.newbyteorder(">")).tofile(f, sep="")
         else:
             # ascii
-            #values.tofile(f, sep=" ")
+            # values.tofile(f, sep=" ")
             for value in values:
-                value.tofile(f, sep= ' ')
+                value.tofile(f, sep=" ")
                 f.write('\n')
             # numpy.savetxt(f, points)
     if write_binary:
