@@ -140,16 +140,16 @@ class Mesh(object):
 
 
     def merge(self, other):
-        from copy import copy
-        points1 = copy(self.points)
-        cells1 = copy(self.cells)
-        point_data1 = copy(self.point_data)
-        cell_data1 = copy(self.cell_data)
+        from copy import deepcopy as dc
+        points1 = dc(self.points)
+        cells1 = dc(self.cells)
+        point_data1 = dc(self.point_data)
+        cell_data1 = dc(self.cell_data)
 
-        points2 = copy(other.points)
-        cells2 = copy(other.cells)
-        point_data2 = copy(other.point_data)
-        cell_data2 = copy(other.cell_data)
+        points2 = dc(other.points)
+        cells2 = dc(other.cells)
+        point_data2 = dc(other.point_data)
+        cell_data2 = dc(other.cell_data)
 
         # assert(point_data1.keys() == point_data2.keys())
 

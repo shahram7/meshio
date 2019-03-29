@@ -496,9 +496,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
             fdir1_0, fdir2_0 = csys[:2]
 
             def _computeDeformationGradient(con):
-                """
-                compute the deformation gradient of the element
-                """
+                """Compute the deformation gradient of the element."""
                 assert(len(con)) in [3, 4], ''
                 # coordinates in the initial configuration
                 x0_coords = np.array([x0[c] for c in con])
@@ -506,21 +504,22 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
                 x1_coords = np.array([points[c] for c in con])
 
                 # compute the derivative of the iso-coordinates
-                if len(con) == 3:  # triangle
+                if len(con) == 3:  # linear triangle
                     B_xii = np.zeros((2, 3))
                     B_xii[0] = [-1., 1., 0.]
                     B_xii[1] = [-1., 0., 1.]
-                else:  # quad at midpoint
+                else:  # linear quad at midpoint
                     B_xii = np.zeros((2, 4))
                     B_xii[0] = [-.25, .25, .25, -.25]
                     B_xii[1] = [-.25, -.25, .25, .25]
                 # compute the Jacobians
                 J_initial = np.dot(B_xii, x0_coords)
-                J_initial_inv = np.dot(la.inv(np.dot(J_initial, J_initial.T)),
-                                       J_initial)
+                J_initial_inv = np.dot(la.inv(np.dot(J_initial,
+                                       J_initial.T)), J_initial)
                 J_current = np.dot(B_xii, x1_coords)
                 # compute F as product of the Jacobians
-                # (F maps from inital to current, via reference configuration )
+                # F maps from inital to current configuration via
+                # reference configuration.
                 F = np.dot(J_current.T, J_initial_inv)
                 return F
 
@@ -529,14 +528,14 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
                 def_grad = np.array([_computeDeformationGradient(con_idx)
                                     for con_idx in cell_con])
                 if 'FDIR1' in list_of_outputs:
-                    fdir1 = np.einsum('ijk,k->ij', def_grad, fdir1_0)
+                    fdir1 = np.einsum('Ijk,k->Ij', def_grad, fdir1_0)
                     fdir1 = np.array([f_i/la.norm(f_i) for f_i in fdir1])
                     try:
                         cell_data[etype].update({'FDIR1': fdir1})
                     except KeyError:
                         cell_data[etype] = {'FDIR1': fdir1}
                 if 'FDIR2' in list_of_outputs:
-                    fdir2 = np.einsum('ijk,k->ij', def_grad, fdir2_0)
+                    fdir2 = np.einsum('Ijk,k->Ij', def_grad, fdir2_0)
                     fdir2 = np.array([f_i/la.norm(f_i) for f_i in fdir2])
                     try:
                         cell_data[etype].update({'FDIR2': fdir2})
@@ -587,7 +586,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
 
 def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
     """
-    This function creates a new part in the selected model data base from
+    This function creates a new part in the selected model database from
     the geometry information stored in a meshio Mesh object
 
     an OdbInstance object, defined in the 'rootAssembly' section
@@ -660,7 +659,7 @@ def convertMeshioToODB(mesh, odbname='test',
     # creat a new odb
     odb = Odb(name=odbname,
               analysisTitle='ODB created from Meshio Instance',
-              description='ODB created from Mesio Instance',
+              description='ODB created from Meshio Instance',
               path=filename)
 
     # create part
