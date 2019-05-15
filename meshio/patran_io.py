@@ -32,7 +32,7 @@ meshio_to_pat_type = {v: k for k, v in pat_to_meshio_type.items()}
 
 
 def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
-         scale=1.0):
+         scale=1.0, autoremove=True):
     """Read a Patran *.pat file.
 
     If a *.ele file, *.xml file or *.nod file is provided or if it has the
@@ -55,6 +55,9 @@ def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
 
         scale : float
             scale factor for nodes
+
+        autoremove : boolean
+            automatically delete cells with no data attached
     """
     with open(filename, "r") as f:
         mesh, element_gids, point_gids = read_pat_buffer(f, scale)
@@ -63,23 +66,24 @@ def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
     ele_filename = ele_filename or filename.replace('.pat', '.ele')
     if os.path.isfile(ele_filename):
         with open(ele_filename, "r") as f:
-            mesh = read_ele_buffer(f, mesh, element_gids)
+            mesh = read_ele_buffer(f, mesh, element_gids, autoremove)
 
     # if *.xml file is present: Add cell or node data
     xml_filename = xml_filename or filename.replace('.pat', '.xml')
     if os.path.isfile(xml_filename):
-        mesh = read_xml_buffer(xml_filename, mesh, element_gids, point_gids)
+        mesh = read_xml_buffer(xml_filename, mesh, element_gids, point_gids,
+                               autoremove)
 
     # if *.nod file is present: Add point data
     nod_filename = nod_filename or filename.replace('.pat', '.nod')
     if os.path.isfile(nod_filename):
         with open(nod_filename, "r") as f:
-            mesh = read_nod_buffer(f, mesh, point_gids)
+            mesh = read_nod_buffer(f, mesh, point_gids, autoremove)
 
     return mesh
 
 
-def read_ele_buffer(f, mesh, element_gids):
+def read_ele_buffer(f, mesh, element_gids, autoremove):
     """Read element based data file."""
 
     name = f.readline().replace(' ', '_').rstrip('\n')
@@ -97,7 +101,7 @@ def read_ele_buffer(f, mesh, element_gids):
         data[ID] = numpy.array(values)
 
     for elem_type in mesh.cells.keys():
-        for gid in element_gids[elem_type]:
+        for pos, gid in enumerate(element_gids[elem_type]):
             try:
                 values = data[gid]
                 if elem_type in mesh.cell_data.keys():
@@ -105,17 +109,22 @@ def read_ele_buffer(f, mesh, element_gids):
                 else:
                     mesh.cell_data[elem_type] = {name: [values]}
             except KeyError:
-                print("No data attached to Element %d. Writing NaN." % gid)
-                values = numpy.nan*numpy.ones(order)
-                if elem_type in mesh.cell_data.keys():
-                    mesh.cell_data[elem_type][name].append(values)
+                if autoremove:
+                    nodes = mesh.cells[elem_type][pos]
+                    mesh.cells[elem_type][pos] = -numpy.ones_like(nodes)
                 else:
-                    mesh.cell_data[elem_type] = {name: [values]}
+                    print("No data attached to Element %d. Writing NaN." % gid)
+                    values = numpy.nan*numpy.ones(order)
+                    if elem_type in mesh.cell_data.keys():
+                        mesh.cell_data[elem_type][name].append(values)
+                    else:
+                        mesh.cell_data[elem_type] = {name: [values]}
 
+    mesh = _delete_cells(mesh)
     return mesh
 
 
-def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
+def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
     """Read element based data file."""
     import xml.etree.ElementTree as ET
 
@@ -138,7 +147,7 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
 
     if "ELDT" in type:
         for elem_type in mesh.cells.keys():
-            for gid in element_gids[elem_type]:
+            for pos, gid in enumerate(element_gids[elem_type]):
                 try:
                     values = data[gid]
                     if name in mesh.cell_data[elem_type].keys():
@@ -146,12 +155,17 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
                     else:
                         mesh.cell_data[elem_type] = {name: [values]}
                 except KeyError:
-                    print("No data attached to Element %d. Writing NaN." % gid)
-                    values = numpy.nan*numpy.ones(order)
-                    if name in mesh.cell_data[elem_type].keys():
-                        mesh.cell_data[elem_type][name].append(values)
+                    if autoremove:
+                        nodes = mesh.cells[elem_type][pos]
+                        mesh.cells[elem_type][pos] = -numpy.ones_like(nodes)
                     else:
-                        mesh.cell_data[elem_type] = {name: [values]}
+                        print("No data attached to Element %d. Writing NaN."
+                              % gid)
+                        values = numpy.nan*numpy.ones(order)
+                        if name in mesh.cell_data[elem_type].keys():
+                            mesh.cell_data[elem_type][name].append(values)
+                        else:
+                            mesh.cell_data[elem_type] = {name: [values]}
 
     elif "NDDT" in type:
         for gid in point_gids:
@@ -172,7 +186,7 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids):
     return mesh
 
 
-def read_nod_buffer(f, mesh, point_gids):
+def read_nod_buffer(f, mesh, point_gids, autoremove):
     """Read node based data file."""
     node_id_map = {}
     for line, id in enumerate(point_gids):
@@ -279,6 +293,15 @@ def _scan_cells(point_gids, cells):
         for value in numpy.nditer(arr, op_flags=["readwrite"]):
             value[...] = numpy.flatnonzero(point_gids == value)[0]
     return cells
+
+
+def _delete_cells(mesh):
+    for elem_type in mesh.cells.keys():
+        mask = ~(mesh.cells[elem_type] < 0).any(axis=1)
+        mesh.cells[elem_type] = mesh.cells[elem_type][mask]
+        print("automatically removed %d cells"
+              % (numpy.size(mask)-numpy.sum(mask)))
+    return mesh
 
 
 def write(filename, mesh):
