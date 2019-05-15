@@ -234,14 +234,17 @@ def read_pat_buffer(f, scale):
             shape_code = int(card_data[2])
             key = pat_to_meshio_type[shape_code]
             if key in cells:
-                cells[key] = numpy.vstack((cells[key], lnodes))
+                cells[key].append(lnodes)
                 element_gids[key].append(int(card_data[1]))
             else:
-                cells[key] = lnodes
+                cells[key] = [lnodes]
                 element_gids[key] = [int(card_data[1])]
         elif line.startswith(" 4"):
             # do not read cross section properties.
-            junk = f.readline()
+            f.readline()
+
+    for key in cells.keys():
+        cells[key] = numpy.vstack(cells[key])
 
     points = numpy.array(points, dtype=float)
     point_gids = numpy.array(point_gids, dtype=int)
