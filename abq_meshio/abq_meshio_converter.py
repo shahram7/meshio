@@ -105,6 +105,10 @@ abaqus_to_meshio_type = {
     #
     # "PYRAMID": "pyramid",
     "C3D6": "wedge",
+    #
+    # continuum shells
+    "SC8": "hexahedron",
+    "SC8R": "hexahedron",
 }
 
 # not complete --> update soon
