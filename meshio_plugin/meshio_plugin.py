@@ -26,9 +26,28 @@ class CreateSymmTensor(AFXForm):
         return gui.CreateSymmTensor(self)
 
 
+class CreateVector(AFXForm):
+    """Form to build a new Vector from existing state variables."""
+
+    def __init__(self, owner):
+        """Pass the toolset for initialization."""
+        AFXForm.__init__(self, owner)
+
+    def getFirstDialog(self):
+        """Fire up the first dialog."""
+        return gui.CreateVector(self)
+
+
 toolset.registerGuiMenuButton(
     buttonText='Meshio|Create new symmetric tensor',
     object=CreateSymmTensor(toolset),
+    version='1.0',
+    author='Nils Meyer'
+    )
+
+toolset.registerGuiMenuButton(
+    buttonText='Meshio|Create new vector',
+    object=CreateVector(toolset),
     version='1.0',
     author='Nils Meyer'
     )

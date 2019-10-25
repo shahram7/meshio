@@ -1,8 +1,8 @@
 """Combine several state variables to new variables in Abaqus."""
 from abaqus import session
 from abaqusConstants import (MAX_PRINCIPAL, MID_PRINCIPAL, MIN_PRINCIPAL,
-                             SINGLE_PRECISION, TENSOR_3D_FULL,
-                             INTEGRATION_POINT)
+                             SINGLE_PRECISION, TENSOR_3D_FULL, VECTOR,
+                             INTEGRATION_POINT, NODAL)
 
 
 def tensor(odb_name, field_name, desc, s1, s2, s3, s4, s5, s6):
@@ -75,6 +75,70 @@ def tensor(odb_name, field_name, desc, s1, s2, s3, s4, s5, s6):
                     instance.name == sdv6.values[0].instance.name):
                 Field.addData(
                     position=INTEGRATION_POINT, instance=instance,
+                    labels=labels, data=data)
+            else:
+                print("Could not create field, data is from different"
+                      " instances.")
+
+    odb.save()
+    odb.close()
+    odb = session.openOdb(name=odb_name)
+    current_viewport = session.currentViewportName
+    session.viewports[current_viewport].setValues(displayedObject=odb)
+    print('Done.')
+    return 1
+
+
+def vector(odb_name, field_name, desc, s1, s2, s3):
+    """Build a vector.
+
+    Parameters
+    ----------
+    odb_name : str
+        Name of output databse.
+    field_name : str
+        Name of field to be generated.
+    desc : str
+        Description of field to be generated.
+    s1 : str
+        Name of 11 component.
+    s2 : str
+        Name of 22 component.
+    s3 : str
+        Name of 33 component.
+
+    """
+    # close ODB and open with write permissions
+    odb = session.openOdb(name=odb_name)
+    odb.close()
+    odb = session.openOdb(name=odb_name, readOnly=False)
+
+    # for each step
+    for stepName in odb.steps.keys():
+        # for each frame
+        for i, frame in enumerate(odb.steps[stepName].frames):
+            sdv1 = frame.fieldOutputs[s1]
+            sdv2 = frame.fieldOutputs[s2]
+            sdv3 = frame.fieldOutputs[s3]
+            labels = []
+            data = []
+            for s1c, s2c, s3c in zip(sdv1.values, sdv2.values, sdv3.values):
+                if s1c.precision == SINGLE_PRECISION:
+                    data.append((s1c.data, s2c.data, s3c.data))
+                else:
+                    data.append((s1c.dataDouble, s2c.dataDouble,
+                                 s3c.dataDouble))
+                labels.append(s1c.nodeLabel)
+
+            # create empty field output
+            Field = frame.FieldOutput(
+                name=field_name, description=desc, type=VECTOR)
+            # fill field output with values
+            instance = sdv1.values[0].instance
+            if (instance.name == sdv2.values[0].instance.name and
+                    instance.name == sdv3.values[0].instance.name):
+                Field.addData(
+                    position=NODAL, instance=instance,
                     labels=labels, data=data)
             else:
                 print("Could not create field, data is from different"
