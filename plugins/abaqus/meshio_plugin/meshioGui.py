@@ -3,11 +3,11 @@
 from abaqusGui import (AFXDataDialog, AFXComboBox, session, FXLabel, FXMAPFUNC,
                        sendCommand, AFXTextField, DIALOG_ACTIONS_SEPARATOR,
                        SEL_COMMAND, showAFXWarningDialog, AFXDialog, AFXForm,
-                       AFXSELECTFILE_EXISTING, AFXFileSelectorDialog,
+                       AFXSELECTFILE_ANY, AFXFileSelectorDialog,
                        FXHorizontalFrame, FXButton, AFXStringTarget, AFXList,
-                       FRAME_GROOVE, LAYOUT_FILL_X, FXGroupBox, FRAME_THICK,
+                       FRAME_GROOVE, FXGroupBox, FRAME_THICK,
                        FXVerticalFrame, LIST_BROWSESELECT, HSCROLLING_ON,
-                       LIST_MULTIPLESELECT, AFXItemProvider, LAYOUT_FILL_Y)
+                       LIST_MULTIPLESELECT, AFXItemProvider)
 from abaqusConstants import SCALAR
 
 
@@ -336,7 +336,7 @@ class ExportODB(AFXDataDialog):
                                                 'Select Source File',
                                                 self.file_name,
                                                 None,
-                                                AFXSELECTFILE_EXISTING,
+                                                AFXSELECTFILE_ANY,
                                                 patterns)
         self.fileDialog.create()
         self.fileDialog.show()
