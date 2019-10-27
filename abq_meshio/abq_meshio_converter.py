@@ -86,6 +86,7 @@ abaqus_to_meshio_type = {
     "C3D8IH": "hexahedron",
     "C3D8R": "hexahedron",
     "C3D8RH": "hexahedron",
+    "EC3D8R": "hexahedron",
     # "HEX9": "hexahedron9",
     "C3D20": "hexahedron20",
     "C3D20H": "hexahedron20",
