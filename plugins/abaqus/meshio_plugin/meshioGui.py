@@ -6,8 +6,8 @@ from abaqusGui import (AFXDataDialog, AFXComboBox, session, FXLabel, FXMAPFUNC,
                        AFXSELECTFILE_ANY, AFXFileSelectorDialog,
                        FXHorizontalFrame, FXButton, AFXStringTarget, AFXList,
                        FRAME_GROOVE, FXGroupBox, FRAME_THICK,
-                       FXVerticalFrame, LIST_BROWSESELECT, HSCROLLING_ON,
-                       LIST_MULTIPLESELECT, AFXItemProvider)
+                       FXVerticalFrame, LIST_BROWSESELECT, HSCROLLING_OFF,
+                       LIST_MULTIPLESELECT)
 from abaqusConstants import SCALAR
 
 
@@ -255,7 +255,7 @@ class ExportODB(AFXDataDialog):
         frame = self.odb.steps[step_name].frames[0]
         for name in frame.fieldOutputs.keys():
             variables.add(name)
-        variables = list(variables)
+        self.variables = list(variables)
 
         hf_selectors = FXHorizontalFrame(self)
 
@@ -264,7 +264,7 @@ class ExportODB(AFXDataDialog):
         gb_instances_label = FXVerticalFrame(gb_instances, FRAME_THICK)
         self.instlist = AFXList(
             gb_instances_label, 10, None, 0,
-            LIST_BROWSESELECT | HSCROLLING_ON)
+            LIST_BROWSESELECT | HSCROLLING_OFF)
         for instance in self.odb.rootAssembly.instances.keys():
             self.instlist.appendItem(instance)
 
@@ -273,7 +273,7 @@ class ExportODB(AFXDataDialog):
         gb_frames_labels = FXVerticalFrame(gb_frames, FRAME_THICK)
         self.framelist = AFXList(
             gb_frames_labels, 10, None, 0,
-            LIST_BROWSESELECT | HSCROLLING_ON)
+            LIST_BROWSESELECT | HSCROLLING_OFF)
         for step_name in self.odb.steps.keys():
             for f in range(len(self.odb.steps[step_name].frames)):
                 self.framelist.appendItem("%s: %d" % (step_name, f))
@@ -283,11 +283,9 @@ class ExportODB(AFXDataDialog):
         gb_variables_label = FXVerticalFrame(gb_variables, FRAME_THICK)
         self.varlist = AFXList(
             gb_variables_label, 10, None, 0,
-            LIST_BROWSESELECT | HSCROLLING_ON | LIST_MULTIPLESELECT)
-        variable_provider = AFXItemProvider(",".join(variables))
-        # for var in variables:
-        #     variable_provider.append(var)
-        self.varlist.setItemProvider(variable_provider)
+            LIST_BROWSESELECT | HSCROLLING_OFF | LIST_MULTIPLESELECT)
+        for i, var in enumerate(self.variables):
+            self.varlist.appendItem(var, None, i)
 
         hf_file = FXHorizontalFrame(self)
         self.sourceTextField = AFXTextField(hf_file, 20, 'Export to:')
@@ -357,9 +355,10 @@ class ExportODB(AFXDataDialog):
         frame_item = self.framelist.getSingleSelection()
         step, frame = self.framelist.getItemText(frame_item).split(": ")
 
-        var_provider = self.varlist.getItemProvider()
-        variables = var_provider.getItems()
-        variables = variables.replace(",", "', '")
+        variables = []
+        for i, var in enumerate(self.variables):
+            if self.varlist.isItemSelected(i):
+                variables.append(var)
 
         tgt = self.file_name.getValue()
 
@@ -370,7 +369,7 @@ class ExportODB(AFXDataDialog):
         sendCommand("instance = odb.rootAssembly.instances['%s']" % inst)
         sendCommand("frame = odb.steps['%s'].frames[%d]" % (step, int(frame)))
         sendCommand("odb_mesh = convertODBtoMeshio(instance, frame,"
-                    " list_of_outputs=['%s'])" % variables)
+                    " list_of_outputs=['%s'])" % "','".join(variables))
         sendCommand("meshio.write('%s', odb_mesh, write_binary=False)" % tgt)
         self.form.deactivate()
         return 1
