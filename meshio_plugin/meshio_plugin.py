@@ -38,6 +38,18 @@ class CreateVector(AFXForm):
         return gui.CreateVector(self)
 
 
+class ExportODB(AFXForm):
+    """Form to export ODB with meshio."""
+
+    def __init__(self, owner):
+        """Pass the toolset for initialization."""
+        AFXForm.__init__(self, owner)
+
+    def getFirstDialog(self):
+        """Fire up the first dialog."""
+        return gui.ExportODB(self)
+
+
 toolset.registerGuiMenuButton(
     buttonText='Meshio|Create new symmetric tensor',
     object=CreateSymmTensor(toolset),
@@ -48,6 +60,13 @@ toolset.registerGuiMenuButton(
 toolset.registerGuiMenuButton(
     buttonText='Meshio|Create new vector',
     object=CreateVector(toolset),
+    version='1.0',
+    author='Nils Meyer'
+    )
+
+toolset.registerGuiMenuButton(
+    buttonText='Meshio|Export ODB',
+    object=ExportODB(toolset),
     version='1.0',
     author='Nils Meyer'
     )
