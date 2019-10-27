@@ -332,7 +332,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
         def processPointOutput(fO):
 
             # process node data
-            print 'processing ' + fO.name
+            print('processing ' + fO.name)
             values = np.array([value.data for value in fO.values])
             if fO.type == SCALAR:
                 point_data[fO.name] = values
@@ -362,7 +362,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
             # use interpolation to output on centroid, to assert on result per
             # element
             fO_elem = fO_elem.getSubset(position=CENTROID)
-            print 'processing ' + fO.name
+            print('processing ' + fO.name)
             etypes = set([abaqus_to_meshio_type[etype]
                           for etype in fO_elem.baseElementTypes])
             # only one element type in fO
