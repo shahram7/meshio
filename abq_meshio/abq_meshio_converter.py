@@ -304,7 +304,7 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
     return mo.Mesh(points, cells, cell_data=cell_data)
 
 
-def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
+def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
     """
     convertODBtoMeshio(mdbObject, frame, list_of_outputs=None, **kwargs)
 
@@ -450,19 +450,22 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=None, **kwargs):
         # if field data is requested
         if list_of_outputs:
             for field_name in list_of_outputs:
-                if type(field_name) == str and not field_name.lower().startswith('fdir'):
+                if (type(field_name) == str
+                        and not field_name.lower().startswith('fdir')):
                     fO = frame.fieldOutputs[field_name]
                     fO = fO.getSubset(region=inst)
                     n_values = len(fO.values)
-                    assert n_values > 0, ERROR_NO_FIELD_DATA.format(field_name,
-                                                                    inst_name)
-                    fO_location = fO.values[0].position  # NODAL, ELEMENT, ...
-                    if fO_location == NODAL:
-                        processPointOutput(fO)
-                    elif fO_location in [CENTROID, INTEGRATION_POINT]:
-                        cell_data_ = processCellOutput(fO)
-                        cell_data = __merge_cellData_dicts(cell_data,
-                                                           cell_data_)
+                    if (n_values > 0):
+                        fO_location = fO.values[0].position  # NODAL, ELEMENT,
+                        if fO_location == NODAL:
+                            processPointOutput(fO)
+                        elif fO_location in [CENTROID, INTEGRATION_POINT]:
+                            cell_data_ = processCellOutput(fO)
+                            cell_data = __merge_cellData_dicts(cell_data,
+                                                               cell_data_)
+                    else:
+                        print(ERROR_NO_FIELD_DATA.format(field_name,
+                                                         inst_name))
 
                 elif type(field_name) in [list, set,
                                           tuple] and len(field_name) == 2:
