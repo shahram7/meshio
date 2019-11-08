@@ -17,9 +17,9 @@ try:
     from abaqus import *
     from abaqusConstants import (NODAL, INTEGRATION_POINT, CENTROID,
                                  VECTOR, SCALAR, TENSOR_3D_FULL,
-                                 TENSOR_3D_SURFACE, TENSOR_3D_PLANAR,
-                                 THREE_D, DEFORMABLE_BODY, LONG_TERM,
-                                 ISOTROPIC, TIME, MAGNITUDE, MISES, TRESCA,
+                                 TENSOR_3D_PLANAR,
+                                 THREE_D, DEFORMABLE_BODY,
+                                 TIME, MAGNITUDE, MISES, TRESCA,
                                  PRESS, INV3, MAX_PRINCIPAL)
     from odbAccess import *
     from odbMaterial import *
@@ -28,91 +28,62 @@ try:
 except ImportError:
     raise SystemError('Functions do only work in Abaqus')
 
-# not complete, has to be completed with new elements (membrane, rigid, ...)
-abaqus_to_meshio_type = {
-    # trusss
-    "T2D2": "line",
-    "T2D2H": "line",
-    "T2D3": "line3",
-    "T2D3H": "line3",
-    "T3D2": "line",
-    "T3D2H": "line",
-    "T3D3": "line3",
-    "T3D3H": "line3",
-    # beams
-    "B21": "line",
-    "B21H": "line",
-    "B22": "line3",
-    "B22H": "line3",
-    "B31": "line",
-    "B31H": "line",
-    "B32": "line3",
-    "B32H": "line3",
-    "B33": "line3",
-    "B33H": "line3",
-    # surfaces
-    "S4": "quad",
-    "S4R": "quad",
-    "S4RS": "quad",
-    "S4RSW": "quad",
-    "S4R5": "quad",
-    "R3D4": "quad",
-    "S8R": "quad8",
-    "S8R5": "quad8",
-    "S9R5": "quad9",
-    # "QUAD": "quad",
-    # "QUAD4": "quad",
-    # "QUAD5": "quad5",
-    # "QUAD8": "quad8",
-    # "QUAD9": "quad9",
-    #
-    "STRI3": "triangle",
-    "S3": "triangle",
-    "S3R": "triangle",
-    "S3RS": "triangle",
-    "M3D3": "triangle",
-    "R3D3": "triangle",
-    # "TRI7": "triangle7",
-    # 'TRISHELL': 'triangle',
-    # 'TRISHELL3': 'triangle',
-    # 'TRISHELL7': 'triangle',
-    #
-    "STRI65": "triangle6",
-    # 'TRISHELL6': 'triangle6',
-    # volumes
-    "C3D8": "hexahedron",
-    "C3D8H": "hexahedron",
-    "C3D8I": "hexahedron",
-    "C3D8IH": "hexahedron",
-    "C3D8R": "hexahedron",
-    "C3D8RH": "hexahedron",
-    "EC3D8R": "hexahedron",
-    # "HEX9": "hexahedron9",
-    "C3D20": "hexahedron20",
-    "C3D20H": "hexahedron20",
-    "C3D20R": "hexahedron20",
-    "C3D20RH": "hexahedron20",
-    # "HEX27": "hexahedron27",
-    #
-    "C3D4": "tetra",
-    "C3D4H": "tetra4",
-    # "TETRA8": "tetra8",
-    "C3D10": "tetra10",
-    "C3D10H": "tetra10",
-    "C3D10I": "tetra10",
-    "C3D10M": "tetra10",
-    "C3D10MH": "tetra10",
-    # "TETRA14": "tetra14",
-    #
-    # "PYRAMID": "pyramid",
-    "C3D6": "wedge",
-    #
-    # continuum shells
-    "SC8": "hexahedron",
-    "SC8R": "hexahedron",
-}
 
-# not complete --> update soon
+def abaqus_to_meshio_type(element_type):
+    """Map Abaqus elment type to meshio types.
+
+    Parameters
+    ----------
+    element_type : str
+        Abaqus element type (e.g C3D8R)
+
+    Returns
+    -------
+    str
+        Meshio element type (e.g. hexahedron)
+
+    """
+
+    # trusss
+    if "T2D2" in element_type or "T3D2" in element_type:
+        return "line"
+    if "T2D3" in element_type or "T3D3" in element_type:
+        return "line3"
+    # beams
+    if "B21" in element_type or "B31" in element_type:
+        return "line"
+    if "B22" in element_type or "B32" in element_type or "B33" in element_type:
+        return "line3"
+    # surfaces
+    if "S4" in element_type or "R3D4" in element_type:
+        return "quad"
+    if "S8" in element_type:
+        return "quad8"
+    if "S8" in element_type:
+        return "quad9"
+    if ("S3" in element_type
+            or "M3D3" in element_type
+            or "R3D3" in element_type):
+        return "triangle"
+    if "STRIA6" in element_type:
+        return "triangle6"
+    # volumes
+    if ("C3D8" in element_type
+            or "EC3D8" in element_type
+            or "SC8" in element_type):
+        return "hexahedron"
+    if "C3D20" in element_type:
+        return "hexahedron20"
+    if "C3D4" in element_type:
+        return "tetra"
+    if "C3D4H" in element_type:
+        return "tetra4"
+    if "C3D10" in element_type:
+        return "tetra10"
+    if "C3D6" in element_type:
+        return "wedge"
+
+
 meshio_to_abaqus_type = {
     'triangle': 'S3R',
     'quad': 'S4R',
@@ -261,7 +232,7 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
             # get the connectivity
             con = [nodeLU[c+1] for c in elem.connectivity]  # consider shift
             # get the type of element, convert to meshio representation
-            etype = abaqus_to_meshio_type[str(elem.type)]
+            etype = abaqus_to_meshio_type(str(elem.type))
             if etype in cells.keys():
                 cells[etype].append(con)
                 cell_data[etype]['ID'] = np.append(cell_data[etype]['ID'],
@@ -363,7 +334,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
             # element
             fO_elem = fO_elem.getSubset(position=CENTROID)
             print('processing ' + fO.name)
-            etypes = set([abaqus_to_meshio_type[etype]
+            etypes = set([abaqus_to_meshio_type(etype)
                           for etype in fO_elem.baseElementTypes])
             # only one element type in fO
             assert len(etypes) == 1,  ERROR_DIFFERENT_ETYPES.format(etypes,
@@ -435,7 +406,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
             # get the connectivity
             con = [nodeLU[c] for c in elem.connectivity]
             # get the type of element, convert to meshio representation
-            etype = abaqus_to_meshio_type[str(elem.type)]
+            etype = abaqus_to_meshio_type(str(elem.type))
             if etype in cells.keys():
                 cells[etype].append(con)
             else:
