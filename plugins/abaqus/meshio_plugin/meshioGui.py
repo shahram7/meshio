@@ -1,5 +1,5 @@
 """GUI for meshio and related tools in Postprocessing."""
-
+#  import time
 from abaqusGui import (AFXDataDialog, AFXComboBox, session, FXLabel, FXMAPFUNC,
                        sendCommand, AFXTextField, DIALOG_ACTIONS_SEPARATOR,
                        SEL_COMMAND, showAFXWarningDialog, AFXDialog, AFXForm,
@@ -8,7 +8,6 @@ from abaqusGui import (AFXDataDialog, AFXComboBox, session, FXLabel, FXMAPFUNC,
                        FRAME_GROOVE, FXGroupBox, FRAME_THICK,
                        FXVerticalFrame, LIST_BROWSESELECT, HSCROLLING_OFF,
                        LIST_MULTIPLESELECT)
-from abaqusConstants import SCALAR
 
 
 class CreateSymmTensor(AFXDataDialog):
@@ -41,13 +40,9 @@ class CreateSymmTensor(AFXDataDialog):
         self.nameTextField = AFXTextField(self, 35, 'Field name:')
         self.descTextField = AFXTextField(self, 35, 'Description:')
 
-        variables = set()
-        step_name = self.odbFile.steps.keys()[0]
-        frame = self.odbFile.steps[step_name].frames[0]
-        for name in frame.fieldOutputs.keys():
-            if frame.fieldOutputs[name].type == SCALAR:
-                variables.add(name)
-        variables = list(variables)
+        variables = []
+        for var in currentViewport.odbDisplay.fieldVariables.variableList:
+            variables.append(var[0])
 
         nvis = len(variables)
         self.s1combo = AFXComboBox(self, 0, nvis, 'Component 11:')
@@ -156,13 +151,9 @@ class CreateVector(AFXDataDialog):
         self.nameTextField = AFXTextField(self, 35, 'Field name:')
         self.descTextField = AFXTextField(self, 35, 'Description:')
 
-        variables = set()
-        step_name = self.odbFile.steps.keys()[0]
-        frame = self.odbFile.steps[step_name].frames[0]
-        for name in frame.fieldOutputs.keys():
-            if frame.fieldOutputs[name].type == SCALAR:
-                variables.add(name)
-        variables = list(variables)
+        variables = []
+        for var in currentViewport.odbDisplay.fieldVariables.variableList:
+            variables.append(var[0])
 
         nvis = len(variables)
         self.s1combo = AFXComboBox(self, 0, nvis, 'Component 1:')
@@ -250,12 +241,9 @@ class ExportODB(AFXDataDialog):
 
         FXLabel(self, 'This plugin exports the ODB with Meshio.')
 
-        variables = set()
-        step_name = self.odb.steps.keys()[0]
-        frame = self.odb.steps[step_name].frames[0]
-        for name in frame.fieldOutputs.keys():
-            variables.add(name)
-        self.variables = list(variables)
+        self.variables = []
+        for var in currentViewport.odbDisplay.fieldVariables.variableList:
+            self.variables.append(var[0])
 
         hf_selectors = FXHorizontalFrame(self)
 
@@ -274,9 +262,11 @@ class ExportODB(AFXDataDialog):
         self.framelist = AFXList(
             gb_frames_labels, 10, None, 0,
             LIST_BROWSESELECT | HSCROLLING_OFF)
-        for step_name in self.odb.steps.keys():
-            for f in range(len(self.odb.steps[step_name].frames)):
-                self.framelist.appendItem("%s: %d" % (step_name, f))
+        for step in currentViewport.odbDisplay.fieldSteps:
+            step_name = step[0]
+            frames = step[7]
+            for i, f in enumerate(frames):
+                self.framelist.appendItem("%s: %d (%s)" % (step_name, i, f))
 
         gb_variables = FXGroupBox(hf_selectors, 'Variables',
                                   FRAME_GROOVE)
@@ -353,7 +343,8 @@ class ExportODB(AFXDataDialog):
         inst = self.instlist.getItemText(instance_item)
 
         frame_item = self.framelist.getSingleSelection()
-        step, frame = self.framelist.getItemText(frame_item).split(": ")
+        substring = self.framelist.getItemText(frame_item).split('(')[0]
+        step, frame = substring.split(": ")
 
         variables = []
         for i, var in enumerate(self.variables):
