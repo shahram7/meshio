@@ -20,6 +20,7 @@ for /l %%i in (1,1,%UBound%) do (
   SET version=!str:~-4!
   :: Copy
   XCOPY %dir%meshio_plugin %root%\!version!\%plugindir%\MeshioPlugin\* /YQ
+  XCOPY %dir%\..\..\meshio %root%\!version!\%codedir%\meshio\* /YQS
 
   XCOPY %dir%abq_meshio %root%\!version!\%codedir%\abq_meshio\* /YQ
 )
