@@ -1,5 +1,5 @@
 """Combine several state variables to new variables in Abaqus."""
-from abaqus import session
+from abaqus import session, milestone
 from abaqusConstants import (MAX_PRINCIPAL, MID_PRINCIPAL, MIN_PRINCIPAL,
                              SINGLE_PRECISION, TENSOR_3D_FULL, VECTOR,
                              INTEGRATION_POINT, NODAL)
@@ -40,7 +40,10 @@ def tensor(odb_name, field_name, desc, s1, s2, s3, s4, s5, s6):
     # for each step
     for stepName in odb.steps.keys():
         # for each frame
+        N = len(odb.steps[stepName].frames)
         for i, frame in enumerate(odb.steps[stepName].frames):
+            milestone('Adding field to frames in step %s' % stepName,
+                      'Frame', i, N)
             sdv1 = frame.fieldOutputs[s1]
             sdv2 = frame.fieldOutputs[s2]
             sdv3 = frame.fieldOutputs[s3]
@@ -116,7 +119,10 @@ def vector(odb_name, field_name, desc, s1, s2, s3):
     # for each step
     for stepName in odb.steps.keys():
         # for each frame
+        N = len(odb.steps[stepName].frames)
         for i, frame in enumerate(odb.steps[stepName].frames):
+            milestone('Adding field to frames in step %s' % stepName,
+                      'Frame', i, N)
             sdv1 = frame.fieldOutputs[s1]
             sdv2 = frame.fieldOutputs[s2]
             sdv3 = frame.fieldOutputs[s3]
