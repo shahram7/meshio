@@ -1,31 +1,32 @@
 """GUI for meshio and related tools in Postprocessing."""
 #  import time
 from abaqusGui import (
-    AFXDataDialog,
-    AFXComboBox,
-    session,
-    FXLabel,
-    FXMAPFUNC,
-    sendCommand,
-    AFXTextField,
-    DIALOG_ACTIONS_SEPARATOR,
-    SEL_COMMAND,
-    showAFXWarningDialog,
-    AFXDialog,
-    AFXForm,
     AFXSELECTFILE_ANY,
-    AFXFileSelectorDialog,
-    FXHorizontalFrame,
-    FXButton,
-    AFXStringTarget,
-    AFXList,
+    DIALOG_ACTIONS_SEPARATOR,
     FRAME_GROOVE,
-    FXGroupBox,
     FRAME_THICK,
-    FXVerticalFrame,
-    LIST_BROWSESELECT,
+    FXMAPFUNC,
     HSCROLLING_OFF,
+    LIST_BROWSESELECT,
     LIST_MULTIPLESELECT,
+    SEL_COMMAND,
+    AFXComboBox,
+    AFXDataDialog,
+    AFXDialog,
+    AFXFileSelectorDialog,
+    AFXForm,
+    AFXList,
+    AFXStringTarget,
+    AFXTextField,
+    FXButton,
+    FXCheckButton,
+    FXGroupBox,
+    FXHorizontalFrame,
+    FXLabel,
+    FXVerticalFrame,
+    sendCommand,
+    session,
+    showAFXWarningDialog,
 )
 
 
@@ -314,6 +315,9 @@ class ExportODB(AFXDataDialog):
             hf_file, "Select File", None, self, self.ID_CLICKED_FILE_BUTTON
         )
 
+        self.check_deform = FXCheckButton(self, "Export deformed geometry.")
+        self.check_deform.setCheck(state=True)
+
         self.appendActionButton("Export", self, self.ID_CLICKED_APPLY)
         self.appendActionButton(self.DISMISS)
 
@@ -377,6 +381,8 @@ class ExportODB(AFXDataDialog):
         substring = self.framelist.getItemText(frame_item).split("(")[0]
         step, frame = substring.split(": ")
 
+        deformed = bool(self.check_deform.getCheck())
+
         variables = []
         for i, var in enumerate(self.variables):
             if self.varlist.isItemSelected(i):
@@ -391,7 +397,8 @@ class ExportODB(AFXDataDialog):
         sendCommand("frame = odb.steps['%s'].frames[%d]" % (step, int(frame)))
         sendCommand(
             "odb_mesh = convertODBtoMeshio(instance, frame,"
-            " list_of_outputs=['%s'])" % "','".join(variables)
+            " list_of_outputs=['%s'], deformed=%s)"
+            % ("','".join(variables), str(deformed))
         )
         sendCommand("meshio.write('%s', odb_mesh, write_binary=False)" % tgt)
         self.form.deactivate()

@@ -15,18 +15,31 @@ reload(mo)
 in_abq = False
 try:
     from abaqus import *
-    from abaqusConstants import (NODAL, INTEGRATION_POINT, CENTROID,
-                                 VECTOR, SCALAR, TENSOR_3D_FULL,
-                                 TENSOR_3D_PLANAR,
-                                 THREE_D, DEFORMABLE_BODY,
-                                 TIME, MAGNITUDE, MISES, TRESCA,
-                                 PRESS, INV3, MAX_PRINCIPAL)
+    from abaqusConstants import (
+        NODAL,
+        INTEGRATION_POINT,
+        CENTROID,
+        VECTOR,
+        SCALAR,
+        TENSOR_3D_FULL,
+        TENSOR_3D_PLANAR,
+        THREE_D,
+        DEFORMABLE_BODY,
+        TIME,
+        MAGNITUDE,
+        MISES,
+        TRESCA,
+        PRESS,
+        INV3,
+        MAX_PRINCIPAL,
+    )
     from odbAccess import *
     from odbMaterial import *
     from odbSection import *
+
     in_abq = True
 except ImportError:
-    raise SystemError('Functions do only work in Abaqus')
+    raise SystemError("Functions do only work in Abaqus")
 
 
 def abaqus_to_meshio_type(element_type):
@@ -61,16 +74,12 @@ def abaqus_to_meshio_type(element_type):
         return "quad8"
     if "S8" in element_type:
         return "quad9"
-    if ("S3" in element_type
-            or "M3D3" in element_type
-            or "R3D3" in element_type):
+    if "S3" in element_type or "M3D3" in element_type or "R3D3" in element_type:
         return "triangle"
     if "STRIA6" in element_type:
         return "triangle6"
     # volumes
-    if ("C3D8" in element_type
-            or "EC3D8" in element_type
-            or "SC8" in element_type):
+    if "C3D8" in element_type or "EC3D8" in element_type or "SC8" in element_type:
         return "hexahedron"
     if "C3D20" in element_type:
         return "hexahedron20"
@@ -85,42 +94,42 @@ def abaqus_to_meshio_type(element_type):
 
 
 meshio_to_abaqus_type = {
-    'triangle': 'S3R',
-    'quad': 'S4R',
-    'hexahedron': 'C3D8R',
-    'tetra': 'C3D4',
-    'wedge': 'C3D6',
-
+    "triangle": "S3R",
+    "quad": "S4R",
+    "hexahedron": "C3D8R",
+    "tetra": "C3D4",
+    "wedge": "C3D6",
 }
 
 # error messages
-ERROR_NO_ODBObject = '{} is no valid ODB object, please pass one of the ' \
-                     + 'following: <odb>, <ODBAssembly>, <ODBInstance>'
-ERROR_NO_MDBObject = '{} is no valid MDB object, please pass one of the ' \
-                     + 'following: <Part>, <PartInstance>, <Assembly>, ' \
-                     + '<Model>'
-ERROR_NO_FIELD_DATA = 'field output {} has no values in  ' \
-                    + 'instance {}'
-ERROR_ELSET_FIELD = 'field output {} is not defined on every element of ' \
-                    + 'instance {}'
-ERROR_RESHAPE_CELL_DATA = '{} cannot be reshaped into shape {}'
-ERROR_DIFFERENT_ETYPES = 'different element types ({}) in {}. This feature ' \
-                         + 'is not supported yet'
+ERROR_NO_ODBObject = (
+    "{} is no valid ODB object, please pass one of the "
+    + "following: <odb>, <ODBAssembly>, <ODBInstance>"
+)
+ERROR_NO_MDBObject = (
+    "{} is no valid MDB object, please pass one of the "
+    + "following: <Part>, <PartInstance>, <Assembly>, "
+    + "<Model>"
+)
+ERROR_NO_FIELD_DATA = "field output {} has no values in  " + "instance {}"
+ERROR_ELSET_FIELD = (
+    "field output {} is not defined on every element of " + "instance {}"
+)
+ERROR_RESHAPE_CELL_DATA = "{} cannot be reshaped into shape {}"
+ERROR_DIFFERENT_ETYPES = (
+    "different element types ({}) in {}. This feature " + "is not supported yet"
+)
 
 
 def __reshape_TENSOR_3D_FULL(value):
     v = value
-    tens = np.array([[v[0], v[3], v[4]],
-                     [v[4], v[1], v[5]],
-                     [v[4], v[5], v[2]]])
+    tens = np.array([[v[0], v[3], v[4]], [v[4], v[1], v[5]], [v[4], v[5], v[2]]])
     return tens
 
 
 def __reshape_TENSOR_3D_PLANAR(value):
     v = value
-    tens = np.array([[v[0], v[3],   0.],
-                     [v[3], v[1],   0.],
-                     [0.,   0.,   v[2]]])
+    tens = np.array([[v[0], v[3], 0.0], [v[3], v[1], 0.0], [0.0, 0.0, v[2]]])
     return tens
 
 
@@ -156,8 +165,8 @@ def __merge_cellData_dicts(dict1, dict2):
 
 
 def __reshape_fieldOutputs(cell_data_field, allocation):
-    '''
-    '''
+    """
+    """
     new_cell_data_dict = {}
     new_field_name, field_names_to_reshape = allocation
     field_names_to_reshape = np.asarray(field_names_to_reshape)
@@ -165,19 +174,18 @@ def __reshape_fieldOutputs(cell_data_field, allocation):
 
     field_names_to_reshape = field_names_to_reshape.flatten()
 
-    assert shape in [(3, 3), (1, 3), (3, 1), (3,)], \
-        ERROR_RESHAPE_CELL_DATA.format(new_cell_data_dict.values(), shape)
+    assert shape in [(3, 3), (1, 3), (3, 1), (3,)], ERROR_RESHAPE_CELL_DATA.format(
+        new_cell_data_dict.values(), shape
+    )
 
     if not set(field_names_to_reshape).issubset(cell_data_field.keys()):
         return {}
 
-    fields_to_reshape = np.array([cell_data_field[f]
-                                  for f in field_names_to_reshape])
+    fields_to_reshape = np.array([cell_data_field[f] for f in field_names_to_reshape])
     fields_to_reshape = np.transpose(fields_to_reshape)
     n_values = fields_to_reshape.shape[0]
     if np.min(shape) > 1 and len(shape) > 1:
-        new_field = fields_to_reshape.reshape((n_values,
-                                               shape[0], shape[1]))
+        new_field = fields_to_reshape.reshape((n_values, shape[0], shape[1]))
     else:
         new_field = fields_to_reshape
 
@@ -205,6 +213,7 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
     Mesh : meshio Mesh object
         ready to write meshio Mesh objects
     """
+
     def convertInstance(mdbInstance, idx_shift=0):
 
         inst = mdbInstance
@@ -218,8 +227,10 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
         points = np.array(points)
 
         # create a lookup table to connect node labels and their array index
-        nodeLU = {key: value for (key, value) in zip(node_labels,
-                  range(idx_shift, n_nodes+idx_shift))}
+        nodeLU = {
+            key: value
+            for (key, value) in zip(node_labels, range(idx_shift, n_nodes + idx_shift))
+        }
 
         # getting the elements is a bit more complex, since we have to sort by
         # type
@@ -230,17 +241,16 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
         # loop over all elements
         for elem in elements:
             # get the connectivity
-            con = [nodeLU[c+1] for c in elem.connectivity]  # consider shift
+            con = [nodeLU[c + 1] for c in elem.connectivity]  # consider shift
             # get the type of element, convert to meshio representation
             etype = abaqus_to_meshio_type(str(elem.type))
             if etype in cells.keys():
                 cells[etype].append(con)
-                cell_data[etype]['ID'] = np.append(cell_data[etype]['ID'],
-                                                   elem.label)
+                cell_data[etype]["ID"] = np.append(cell_data[etype]["ID"], elem.label)
             else:
                 # create a new key for a new element set
                 cells[etype] = [con]
-                cell_data[etype] = {'ID': np.array([elem.label])}
+                cell_data[etype] = {"ID": np.array([elem.label])}
 
         cells.update((key, np.array(cons)) for key, cons in cells.items())
         return points, cells, cell_data
@@ -275,7 +285,7 @@ def convertMDBtoMeshio(mdbObject, **kwargs):
     return mo.Mesh(points, cells, cell_data=cell_data)
 
 
-def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
+def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kwargs):
     """
     convertODBtoMeshio(mdbObject, frame, list_of_outputs=None, **kwargs)
 
@@ -297,25 +307,22 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
     Mesh : meshio Mesh object
         ready to write meshio Mesh objects
     """
-    def convertInstance(odbInstance, frame, idx_shift=0,
-                        list_of_outputs=None):
 
+    def convertInstance(odbInstance, frame, idx_shift=0, list_of_outputs=None):
         def processPointOutput(fO):
 
             # process node data
-            print('processing ' + fO.name)
+            print("processing " + fO.name)
             values = np.array([value.data for value in fO.values])
             if fO.type == SCALAR:
                 point_data[fO.name] = values
             elif fO.type == VECTOR:
                 point_data[fO.name] = values
             elif fO.type == TENSOR_3D_FULL:
-                values_rs = np.array([__reshape_TENSOR_3D_FULL(v)
-                                      for v in values])
+                values_rs = np.array([__reshape_TENSOR_3D_FULL(v) for v in values])
                 point_data[fO.name] = values_rs
             elif fO.type == TENSOR_3D_PLANAR:
-                values_rs = np.array([__reshape_TENSOR_3D_PLANAR(v)
-                                      for v in values])
+                values_rs = np.array([__reshape_TENSOR_3D_PLANAR(v) for v in values])
                 point_data[fO.name] = values_rs
             return
 
@@ -327,27 +334,38 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
                 fO_elem = fO
             n_el_values = len(fO_elem.values)
             # check for availability of field output on each element
-            assert n_el_values == n_elements, (ERROR_ELSET_FIELD
-                                               .format(field_name,
-                                                       inst_name))
+            assert n_el_values == n_elements, ERROR_ELSET_FIELD.format(
+                field_name, inst_name
+            )
             # use interpolation to output on centroid, to assert on result per
             # element
             fO_elem = fO_elem.getSubset(position=CENTROID)
-            print('processing ' + fO.name)
-            etypes = set([abaqus_to_meshio_type(etype)
-                          for etype in fO_elem.baseElementTypes])
+            print("processing " + fO.name)
+            etypes = set(
+                [abaqus_to_meshio_type(etype) for etype in fO_elem.baseElementTypes]
+            )
             # only one element type in fO
-            assert len(etypes) == 1,  ERROR_DIFFERENT_ETYPES.format(etypes,
-                                                                    inst_name)
+            assert len(etypes) == 1, ERROR_DIFFERENT_ETYPES.format(etypes, inst_name)
             if fO.type == TENSOR_3D_FULL:
-                values_list = [np.array([__reshape_TENSOR_3D_FULL(value.data)
-                                         for value in fO_elem.values])]
+                values_list = [
+                    np.array(
+                        [
+                            __reshape_TENSOR_3D_FULL(value.data)
+                            for value in fO_elem.values
+                        ]
+                    )
+                ]
             elif fO.type == TENSOR_3D_PLANAR:
-                values_list = [np.array([__reshape_TENSOR_3D_PLANAR(value.data)
-                               for value in fO_elem.values])]
+                values_list = [
+                    np.array(
+                        [
+                            __reshape_TENSOR_3D_PLANAR(value.data)
+                            for value in fO_elem.values
+                        ]
+                    )
+                ]
             else:
-                values_list = [np.array([value.data
-                               for value in fO_elem.values])]
+                values_list = [np.array([value.data for value in fO_elem.values])]
 
             cell_data_ = {}
             for etype, values in zip(etypes, values_list):
@@ -361,8 +379,9 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
         nodes = inst.nodes
         elements = inst.elements
 
-        isElSet = str(type(odbInstance)) == "<type 'OdbSet'>" and \
-                                            hasattr(odbInstance, 'elements')
+        isElSet = str(type(odbInstance)) == "<type 'OdbSet'>" and hasattr(
+            odbInstance, "elements"
+        )
 
         if isElSet:
             eset = odbInstance
@@ -371,13 +390,13 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
             # get the instance that contains the element set
             # actually, we would have to check if *each* element in the set
             # is part of the same instance
-            inst = eval('.'.join(repr(elements[0]).split('.')[:-1]))
+            inst = eval(".".join(repr(elements[0]).split(".")[:-1]))
             nodes = inst.nodes
 
         # in the odb the initial coordinates are saved as a member to each
         # Node Object. i.o. to get the current coords, we have to extract the
         # displacement field and add the values
-        dispField = frame.fieldOutputs['U']
+        dispField = frame.fieldOutputs["U"]
         dispField = dispField.getSubset(region=inst)
         disp_values = dispField.values
         nLU = inst.getNodeFromLabel  # built-in function
@@ -385,16 +404,26 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
         n_nodes = len(nodes)
         n_elements = len(elements)
         # get node informations and coordinates
-        node_labels, disp, x0 = zip(*[(value.nodeLabel, value.data,
-                                      nLU(value.nodeLabel).coordinates)
-                                      for value in disp_values])
+        node_labels, disp, x0 = zip(
+            *[
+                (value.nodeLabel, value.data, nLU(value.nodeLabel).coordinates)
+                for value in disp_values
+            ]
+        )
         x0 = np.array(x0)
         disp = np.array(disp)
-        points = disp + x0
+        if deformed:
+            points = disp + x0
+            print("Export deformed geometry.")
+        else:
+            points = x0
+            print("Export undeformed geometry.")
 
         # create a lookup table to connect node labels and their array index
-        nodeLU = {key: value for (key, value) in zip(node_labels,
-                  range(idx_shift, n_nodes+idx_shift))}
+        nodeLU = {
+            key: value
+            for (key, value) in zip(node_labels, range(idx_shift, n_nodes + idx_shift))
+        }
 
         # getting the elements is a bit more complex, since we have to sort by
         # type
@@ -421,25 +450,23 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
         # if field data is requested
         if list_of_outputs:
             for field_name in list_of_outputs:
-                if (type(field_name) == str
-                        and not field_name.lower().startswith('fdir')):
+                if type(field_name) == str and not field_name.lower().startswith(
+                    "fdir"
+                ):
                     fO = frame.fieldOutputs[field_name]
                     fO = fO.getSubset(region=inst)
                     n_values = len(fO.values)
-                    if (n_values > 0):
+                    if n_values > 0:
                         fO_location = fO.values[0].position  # NODAL, ELEMENT,
                         if fO_location == NODAL:
                             processPointOutput(fO)
                         elif fO_location in [CENTROID, INTEGRATION_POINT]:
                             cell_data_ = processCellOutput(fO)
-                            cell_data = __merge_cellData_dicts(cell_data,
-                                                               cell_data_)
+                            cell_data = __merge_cellData_dicts(cell_data, cell_data_)
                     else:
-                        print(ERROR_NO_FIELD_DATA.format(field_name,
-                                                         inst_name))
+                        print(ERROR_NO_FIELD_DATA.format(field_name, inst_name))
 
-                elif type(field_name) in [list, set,
-                                          tuple] and len(field_name) == 2:
+                elif type(field_name) in [list, set, tuple] and len(field_name) == 2:
                     new_field_names = field_name[1]
                     new_field_names = np.asarray(new_field_names)
                     new_field_names = new_field_names.flatten()
@@ -447,42 +474,39 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
                         fO = frame.fieldOutputs[fn]
                         fO = fO.getSubset(region=inst)
                         n_values = len(fO.values)
-                        assert n_values > 0, \
-                            ERROR_NO_FIELD_DATA.format(field_name,
-                                                       inst_name)
+                        assert n_values > 0, ERROR_NO_FIELD_DATA.format(
+                            field_name, inst_name
+                        )
 
                         fO_location = fO.values[0].position  # NODAL, ELEMENT,
                         if fO_location == NODAL:
                             processPointOutput(fO)
                         elif fO_location in [CENTROID, INTEGRATION_POINT]:
                             cell_data_ = processCellOutput(fO)
-                            cell_data = __merge_cellData_dicts(cell_data,
-                                                               cell_data_)
+                            cell_data = __merge_cellData_dicts(cell_data, cell_data_)
 
                     if fO_location == NODAL:
-                        new_point_data = __reshape_fieldOutputs(point_data,
-                                                                field_name)
+                        new_point_data = __reshape_fieldOutputs(point_data, field_name)
                         point_data.update(new_point_data)
                         for fn in set(new_field_names):
                             del point_data[fn]
 
                     if fO_location in [CENTROID, INTEGRATION_POINT]:
                         for etype, cd_dict in cell_data.items():
-                            new_cd_dict = __reshape_fieldOutputs(cd_dict,
-                                                                 field_name)
+                            new_cd_dict = __reshape_fieldOutputs(cd_dict, field_name)
                             cd_dict.update(new_cd_dict)
                             for fn in set(new_field_names):
                                 del cd_dict[fn]
 
-        if 'FDIR1' in list_of_outputs or 'FDIR2' in list_of_outputs:
+        if "FDIR1" in list_of_outputs or "FDIR2" in list_of_outputs:
             # get initial fiber orientation from stress field
-            stress = frame.fieldOutputs['S'].getSubset(region=eset)
+            stress = frame.fieldOutputs["S"].getSubset(region=eset)
             csys = np.asarray(stress.values[0].localCoordSystem)
             fdir1_0, fdir2_0 = csys[:2]
 
             def _computeDeformationGradient(con):
                 """Compute the deformation gradient of the element."""
-                assert(len(con)) in [3, 4], ''
+                assert (len(con)) in [3, 4], ""
                 # coordinates in the initial configuration
                 x0_coords = np.array([x0[c] for c in con])
                 # coordinates in the current configuration
@@ -491,16 +515,17 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
                 # compute the derivative of the iso-coordinates
                 if len(con) == 3:  # linear triangle
                     B_xii = np.zeros((2, 3))
-                    B_xii[0] = [-1., 1., 0.]
-                    B_xii[1] = [-1., 0., 1.]
+                    B_xii[0] = [-1.0, 1.0, 0.0]
+                    B_xii[1] = [-1.0, 0.0, 1.0]
                 else:  # linear quad at midpoint
                     B_xii = np.zeros((2, 4))
-                    B_xii[0] = [-.25, .25, .25, -.25]
-                    B_xii[1] = [-.25, -.25, .25, .25]
+                    B_xii[0] = [-0.25, 0.25, 0.25, -0.25]
+                    B_xii[1] = [-0.25, -0.25, 0.25, 0.25]
                 # compute the Jacobians
                 J_initial = np.dot(B_xii, x0_coords)
-                J_initial_inv = np.dot(la.inv(np.dot(J_initial,
-                                       J_initial.T)), J_initial)
+                J_initial_inv = np.dot(
+                    la.inv(np.dot(J_initial, J_initial.T)), J_initial
+                )
                 J_current = np.dot(B_xii, x1_coords)
                 # compute F as product of the Jacobians
                 # F maps from inital to current configuration via
@@ -510,40 +535,39 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
 
             for etype, cell_con in cells.items():
 
-                def_grad = np.array([_computeDeformationGradient(con_idx)
-                                    for con_idx in cell_con])
-                if 'FDIR1' in list_of_outputs:
-                    fdir1 = np.einsum('Ijk,k->Ij', def_grad, fdir1_0)
-                    fdir1 = np.array([f_i/la.norm(f_i) for f_i in fdir1])
+                def_grad = np.array(
+                    [_computeDeformationGradient(con_idx) for con_idx in cell_con]
+                )
+                if "FDIR1" in list_of_outputs:
+                    fdir1 = np.einsum("Ijk,k->Ij", def_grad, fdir1_0)
+                    fdir1 = np.array([f_i / la.norm(f_i) for f_i in fdir1])
                     try:
-                        cell_data[etype].update({'FDIR1': fdir1})
+                        cell_data[etype].update({"FDIR1": fdir1})
                     except KeyError:
-                        cell_data[etype] = {'FDIR1': fdir1}
-                if 'FDIR2' in list_of_outputs:
-                    fdir2 = np.einsum('Ijk,k->Ij', def_grad, fdir2_0)
-                    fdir2 = np.array([f_i/la.norm(f_i) for f_i in fdir2])
+                        cell_data[etype] = {"FDIR1": fdir1}
+                if "FDIR2" in list_of_outputs:
+                    fdir2 = np.einsum("Ijk,k->Ij", def_grad, fdir2_0)
+                    fdir2 = np.array([f_i / la.norm(f_i) for f_i in fdir2])
                     try:
-                        cell_data[etype].update({'FDIR2': fdir2})
+                        cell_data[etype].update({"FDIR2": fdir2})
                     except KeyError:
-                        cell_data[etype] = {'FDIR2': fdir2}
+                        cell_data[etype] = {"FDIR2": fdir2}
 
                 try:
-                    cell_data[etype].update({'F': def_grad})
+                    cell_data[etype].update({"F": def_grad})
                 except KeyError:
-                    cell_data[etype] = {'F': def_grad}
+                    cell_data[etype] = {"F": def_grad}
 
         return points, cells, point_data, cell_data
 
     tic = time()
-    if str(type(odbObject)) in ["<type 'OdbInstance'>",
-                                "<type 'OdbSet'>"]:
+    if str(type(odbObject)) in ["<type 'OdbInstance'>", "<type 'OdbSet'>"]:
         odbInstance = odbObject
-        points, cells, point_data, cell_data = convertInstance(odbInstance,
-                                                               frame, 0,
-                                                               list_of_outputs)
+        points, cells, point_data, cell_data = convertInstance(
+            odbInstance, frame, 0, list_of_outputs
+        )
 
-    elif str(odbObject.__class__) in ["<type 'Odb'>",
-                                      "<type 'OdbAssembly'>"]:
+    elif str(odbObject.__class__) in ["<type 'Odb'>", "<type 'OdbAssembly'>"]:
         cells = {}
         points = np.empty((0, 3))
 
@@ -559,17 +583,17 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], **kwargs):
         for inst_name in rA.instances.keys():
             inst = rA.instances[inst_name]
 
-            if inst_name not in ['Assembly', 'ASSEMBLY', 'assembly']:
+            if inst_name not in ["Assembly", "ASSEMBLY", "assembly"]:
                 points_, cells_ = convertInstance(inst, frame, idx_shift)[:2]
                 points = np.vstack((points, points_))
                 cells = __merge_numpy_dicts(cells, cells_)
                 idx_shift += len(points_)
     toc = time()
-    print('took {} seconds'.format(toc-tic))
+    print("took {} seconds".format(toc - tic))
     return mo.Mesh(points, cells, point_data, cell_data)
 
 
-def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
+def convertMeshioToMDB(mesh, partname="test", modelname="Model-1", **kwargs):
     """
     This function creates a new part in the selected model database from
     the geometry information stored in a meshio Mesh object
@@ -590,16 +614,18 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
     Mesh : meshio Mesh object
         ready to write meshio Mesh object
     """
-    print("Warning: only the geometry of the mesh can be converted to ABAQUS´"
-          + "model database. Information on field data is lost.")
-    assert type(mesh) == mo.mesh.Mesh, 'No meshio Mesh instance'
+    print(
+        "Warning: only the geometry of the mesh can be converted to ABAQUS´"
+        + "model database. Information on field data is lost."
+    )
+    assert type(mesh) == mo.mesh.Mesh, "No meshio Mesh instance"
     all_points = mesh.points
     all_cells = mesh.cells
     n_points = len(all_points)
 
     # convert nodes to abaqus comaptible representation
     nodeCoords = zip(all_points[:, 0], all_points[:, 1], all_points[:, 2])
-    nodeLabels = list(range(1, n_points+1))
+    nodeLabels = list(range(1, n_points + 1))
     nodeData = [nodeLabels, nodeCoords]
 
     elementData = []
@@ -607,12 +633,11 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
     for etype, els in all_cells.items():
         # convert cells to abaqus compatible representation
         abq_element_type = meshio_to_abaqus_type[etype]
-        element_labels = range(element_label_shift,
-                               len(els)+element_label_shift)
+        element_labels = range(element_label_shift, len(els) + element_label_shift)
 
         # abaqus requires list and int data types
         # consider shifting node labels in connectivity
-        element_con = [[int(i+1) for i in x] for x in els]
+        element_con = [[int(i + 1) for i in x] for x in els]
         elementData.append([abq_element_type, element_labels, element_con])
         # continue counting in next iteration
         element_label_shift += len(els)
@@ -622,18 +647,23 @@ def convertMeshioToMDB(mesh, partname='test', modelname='Model-1', **kwargs):
     i = 0
     while partname in partnames:
         if i == 0:
-            print('Warning: a part named {} is ' /
-                  'already in model {}.'.format(partname, modelname))
-        partname += '_{}'.format(i)
+            print(
+                "Warning: a part named {} is "
+                / "already in model {}.".format(partname, modelname)
+            )
+        partname += "_{}".format(i)
         i += 1
 
-    model.PartFromNodesAndElements(name=partname, dimensionality=THREE_D,
-                                   type=DEFORMABLE_BODY, nodes=nodeData,
-                                   elements=elementData)
+    model.PartFromNodesAndElements(
+        name=partname,
+        dimensionality=THREE_D,
+        type=DEFORMABLE_BODY,
+        nodes=nodeData,
+        elements=elementData,
+    )
 
 
-def convertMeshioToODB(mesh, odbname='test',
-                       filename='test.odb', **kwargs):
+def convertMeshioToODB(mesh, odbname="test", filename="test.odb", **kwargs):
 
     all_points = mesh.points
     n_points = len(all_points)
@@ -642,144 +672,162 @@ def convertMeshioToODB(mesh, odbname='test',
     all_element_data = mesh.cell_data
 
     # creat a new odb
-    odb = Odb(name=odbname,
-              analysisTitle='ODB created from Meshio Instance',
-              description='ODB created from Meshio Instance',
-              path=filename)
+    odb = Odb(
+        name=odbname,
+        analysisTitle="ODB created from Meshio Instance",
+        description="ODB created from Meshio Instance",
+        path=filename,
+    )
 
     # add section
-    sCat = odb.SectionCategory(name='S5',
-                               description='Five-Layered Shell')
+    sCat = odb.SectionCategory(name="S5", description="Five-Layered Shell")
 
     # create part
-    odb_part = odb.Part(name='part-1', embeddedSpace=THREE_D,
-                        type=DEFORMABLE_BODY)
+    odb_part = odb.Part(name="part-1", embeddedSpace=THREE_D, type=DEFORMABLE_BODY)
 
     # get the nodes
-    node_labels = range(1, 1+n_points)
+    node_labels = range(1, 1 + n_points)
     node_list = zip(node_labels, *[all_points[:, i] for i in (0, 1, 2)])
 
     # add nodes to odb part
-    odb_part.addNodes(nodeData=node_list,
-                      nodeSetName='nset-1')
+    odb_part.addNodes(nodeData=node_list, nodeSetName="nset-1")
 
     # get element data
     element_label_shift = 1
     element_labels_LU = {}
     for etype, els in all_elements.items():
         abq_element_type = meshio_to_abaqus_type[etype]
-        element_labels = range(element_label_shift,
-                               len(els)+element_label_shift)
+        element_labels = range(element_label_shift, len(els) + element_label_shift)
         # consider shifting node labels in connectivity
-        element_con = [[int(i+1) for i in x] for x in els]
-        odb_part.addElements(labels=element_labels, connectivity=element_con,
-                             type=abq_element_type,
-                             elementSetName='{}'.format(etype))
+        element_con = [[int(i + 1) for i in x] for x in els]
+        odb_part.addElements(
+            labels=element_labels,
+            connectivity=element_con,
+            type=abq_element_type,
+            elementSetName="{}".format(etype),
+        )
         # continue counting in next iteration
         element_label_shift += len(els)
         element_labels_LU[etype] = element_labels
 
     # instance part
-    odb_inst = odb.rootAssembly.Instance(name='part-1-1',
-                                         object=odb_part)
+    odb_inst = odb.rootAssembly.Instance(name="part-1-1", object=odb_part)
 
     # create step and frame
     if all_node_data or all_element_data:
-        dummy_step = odb.Step(name='step-1', domain=TIME, timePeriod=1.,
-                              description='first analysis step')
-        dummy_frame = dummy_step.Frame(incrementNumber=0, frameValue=0.,
-                                       description='1st frame')
+        dummy_step = odb.Step(
+            name="step-1",
+            domain=TIME,
+            timePeriod=1.0,
+            description="first analysis step",
+        )
+        dummy_frame = dummy_step.Frame(
+            incrementNumber=0, frameValue=0.0, description="1st frame"
+        )
 
     # write node data
     for nd_name, node_data in all_node_data.items():
 
         shape = node_data.shape
-        if shape == (n_points, ):
+        if shape == (n_points,):
             field_type = SCALAR
         elif shape == (n_points, 3):
             field_type = VECTOR
         elif shape == (n_points, 3, 3):
             field_type = TENSOR_3D_FULL
         else:
-            print('only scalar and vector data is supported atm')
+            print("only scalar and vector data is supported atm")
             continue
 
-        newField = dummy_frame.FieldOutput(name='{}'.format(nd_name),
-                                           description='{}'.format(nd_name),
-                                           type=field_type)
+        newField = dummy_frame.FieldOutput(
+            name="{}".format(nd_name), description="{}".format(nd_name), type=field_type
+        )
         if field_type == SCALAR:
-            newField.addData(position=NODAL, instance=odb_inst,
-                             labels=node_labels,
-                             data=[[x] for x in node_data])
+            newField.addData(
+                position=NODAL,
+                instance=odb_inst,
+                labels=node_labels,
+                data=[[x] for x in node_data],
+            )
 
         elif field_type == VECTOR:
-            newField.setComponentLabels(('1', '2', '3'))
-            newField.setValidInvariants((MAGNITUDE, ))
-            newField.addData(position=NODAL, instance=odb_inst,
-                             labels=node_labels, data=node_data)
+            newField.setComponentLabels(("1", "2", "3"))
+            newField.setValidInvariants((MAGNITUDE,))
+            newField.addData(
+                position=NODAL, instance=odb_inst, labels=node_labels, data=node_data
+            )
         elif field_type == TENSOR_3D_FULL:
             # assume symmetry, keep only the relevant components,
             # reshape to abaqus order
-            node_data = [x.flatten()[[0, 4, 8, 1, 2, 5]]
-                         for x in node_data]
-            newField.setComponentLabels(('11', '22', '33',
-                                         '12', '13', '23'))
-            newField.setValidInvariants((MISES, TRESCA, PRESS,
-                                         INV3, MAX_PRINCIPAL))
-            newField.addData(position=NODAL, instance=odb_inst,
-                             labels=node_labels,
-                             data=[x.tolist() for x in node_data])
+            node_data = [x.flatten()[[0, 4, 8, 1, 2, 5]] for x in node_data]
+            newField.setComponentLabels(("11", "22", "33", "12", "13", "23"))
+            newField.setValidInvariants((MISES, TRESCA, PRESS, INV3, MAX_PRINCIPAL))
+            newField.addData(
+                position=NODAL,
+                instance=odb_inst,
+                labels=node_labels,
+                data=[x.tolist() for x in node_data],
+            )
         else:
-            print('ERROR processing node output {}'.format(nd_name))
+            print("ERROR processing node output {}".format(nd_name))
 
     # write element data
     for etype, ed_dict in all_element_data.items():
         for ed_name, element_data in ed_dict.items():
             n_elements = len(element_data)
             shape = element_data.shape
-            if shape == (n_elements, ):
+            if shape == (n_elements,):
                 field_type = SCALAR
             elif shape == (n_elements, 3):
                 field_type = VECTOR
             elif shape == (n_elements, 3, 3):
                 field_type = TENSOR_3D_FULL
             else:
-                print('only scalar, vector and full3d data is supported atm')
+                print("only scalar, vector and full3d data is supported atm")
                 continue
             if ed_name not in dummy_frame.fieldOutputs.keys():
                 # create new
-                currentField = (dummy_frame.
-                                FieldOutput(name='{}'.format(ed_name),
-                                            description='{}'.format(ed_name),
-                                            type=field_type))
+                currentField = dummy_frame.FieldOutput(
+                    name="{}".format(ed_name),
+                    description="{}".format(ed_name),
+                    type=field_type,
+                )
             else:
-                currentField = dummy_frame.fieldOutputs['{}'.format(ed_name)]
+                currentField = dummy_frame.fieldOutputs["{}".format(ed_name)]
 
             # add data to field_output
             if field_type == SCALAR:
-                currentField.addData(position=CENTROID, instance=odb_inst,
-                                     labels=element_labels_LU[etype],
-                                     data=[[x] for x in element_data])
+                currentField.addData(
+                    position=CENTROID,
+                    instance=odb_inst,
+                    labels=element_labels_LU[etype],
+                    data=[[x] for x in element_data],
+                )
             elif field_type == VECTOR:
-                currentField.setComponentLabels(('1', '2', '3'))
-                currentField.setValidInvariants((MAGNITUDE, ))
-                currentField.addData(position=CENTROID, instance=odb_inst,
-                                     labels=element_labels_LU[etype],
-                                     data=[x.tolist() for x in element_data])
+                currentField.setComponentLabels(("1", "2", "3"))
+                currentField.setValidInvariants((MAGNITUDE,))
+                currentField.addData(
+                    position=CENTROID,
+                    instance=odb_inst,
+                    labels=element_labels_LU[etype],
+                    data=[x.tolist() for x in element_data],
+                )
             elif field_type == TENSOR_3D_FULL:
                 # assume symmetry, keep only the relevant components,
                 # reshape to abaqus order
-                element_data = [x.flatten()[[0, 4, 8, 1, 2, 5]]
-                                for x in element_data]
-                currentField.setComponentLabels(('11', '22', '33',
-                                                 '12', '13', '23'))
-                currentField.setValidInvariants((MISES, TRESCA, PRESS,
-                                                 INV3, MAX_PRINCIPAL))
-                currentField.addData(position=CENTROID, instance=odb_inst,
-                                     labels=element_labels_LU[etype],
-                                     data=[x.tolist() for x in element_data])
+                element_data = [x.flatten()[[0, 4, 8, 1, 2, 5]] for x in element_data]
+                currentField.setComponentLabels(("11", "22", "33", "12", "13", "23"))
+                currentField.setValidInvariants(
+                    (MISES, TRESCA, PRESS, INV3, MAX_PRINCIPAL)
+                )
+                currentField.addData(
+                    position=CENTROID,
+                    instance=odb_inst,
+                    labels=element_labels_LU[etype],
+                    data=[x.tolist() for x in element_data],
+                )
             else:
-                print('ERROR processing element output {}'.format(ed_name))
+                print("ERROR processing element output {}".format(ed_name))
 
     pathToODB = odb.path
     odb.save()
