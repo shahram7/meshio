@@ -1,6 +1,6 @@
 """Provide tools to export results with meshio."""
-from abaqusGui import getAFXApp, AFXForm
 import meshioGui as gui
+from abaqusGui import AFXForm, getAFXApp
 
 # Get toolset from Abaqus GUI application. The new plugins must be registered
 # to this toolset in order to load at Abaqus startup
@@ -51,22 +51,22 @@ class ExportODB(AFXForm):
 
 
 toolset.registerGuiMenuButton(
-    buttonText='Meshio|Create new symmetric tensor',
+    buttonText="Meshio|Create new symmetric tensor",
     object=CreateSymmTensor(toolset),
-    version='1.0',
-    author='Nils Meyer'
-    )
+    version="1.0",
+    author="Nils Meyer",
+)
 
 toolset.registerGuiMenuButton(
-    buttonText='Meshio|Create new vector',
+    buttonText="Meshio|Create new vector",
     object=CreateVector(toolset),
-    version='1.0',
-    author='Nils Meyer'
-    )
+    version="1.0",
+    author="Nils Meyer",
+)
 
 toolset.registerGuiMenuButton(
-    buttonText='Meshio|Export ODB',
+    buttonText="Meshio|Export ODB",
     object=ExportODB(toolset),
-    version='1.0',
-    author='Nils Meyer'
-    )
+    version="1.0",
+    author="Nils Meyer",
+)

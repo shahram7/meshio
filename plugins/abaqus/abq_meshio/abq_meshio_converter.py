@@ -5,10 +5,12 @@ Created on Fri Jan 25 18:04:22 2019
 @author: wt4452
 """
 
+from time import time
+
 import numpy as np
 import numpy.linalg as la
+
 import meshio as mo
-from time import time
 
 reload(mo)
 
