@@ -478,7 +478,11 @@ def _write_points(f, points, write_binary):
         points.astype(points.dtype.newbyteorder(">")).tofile(f, sep="")
     else:
         for point in points:
-            point.tofile(f, sep=" ")
+            if numpy.version.version == '1.6.2':
+                #workaround to handle ABQ Error with tofile function
+                f.write('%f %f %f' %(point[0], point[1], point[2]))
+            else:
+                point.tofile(f, sep=" ")
             f.write('\n')
     if write_binary:
         f.write("\n".encode("utf-8"))
@@ -608,7 +612,12 @@ def _write_field_data(f, data, write_binary):
             # ascii
             # values.tofile(f, sep=" ")
             for value in values:
-                value.tofile(f, sep=" ")
+                if numpy.version.version == '1.6.2':
+                    #workaround to handle ABQ Error with tofile function
+                    for v in value:
+                        f.write('%f ' %v)
+                else:
+                    value.tofile(f, sep=" ")
                 f.write('\n')
             # numpy.savetxt(f, points)
     if write_binary:
