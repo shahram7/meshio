@@ -251,7 +251,13 @@ def read_buffer(f):
 def _read_points(f, data_type, is_ascii, num_points):
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
-        points = numpy.fromfile(f, count=num_points * 3, sep=" ", dtype=dtype)
+        #workaround for ABQ Error
+        try:
+            points = numpy.fromfile(f, count=num_points * 3, sep=" ", dtype=dtype)
+        except:
+            points = f.read().split()
+            points = [float(i) for i in points]
+            points = numpy.array(points)
     else:
         # Binary data is big endian, see
         # <https://www.vtk.org/Wiki/VTK/Writing_VTK_files_using_python#.22legacy.22>.
@@ -265,7 +271,14 @@ def _read_points(f, data_type, is_ascii, num_points):
 
 def _read_cells(f, is_ascii, num_items):
     if is_ascii:
-        c = numpy.fromfile(f, count=num_items, sep=" ", dtype=int)
+        #workaround for ABQ Error
+        try:
+            c = numpy.fromfile(f, count=num_items, sep=" ", dtype=int)
+        except:
+            c = f.read().split()
+            c = [int(i) for i in c]
+            c = numpy.array(c)
+            
     else:
         c = numpy.fromfile(f, count=num_items, dtype=">i4")
         line = f.readline().decode("utf-8")
@@ -276,7 +289,13 @@ def _read_cells(f, is_ascii, num_items):
 
 def _read_cell_types(f, is_ascii, num_items):
     if is_ascii:
-        ct = numpy.fromfile(f, count=int(num_items), sep=" ", dtype=int)
+        #workaround for ABQ Error
+        try:
+            ct = numpy.fromfile(f, count=int(num_items), sep=" ", dtype=int)
+        except:
+            ct = f.read().split()
+            ct = [int(i) for i in ct]
+            ct = numpy.array(ct)
     else:
         # binary
         ct = numpy.fromfile(f, count=int(num_items), dtype=">i4")
@@ -301,8 +320,13 @@ def _read_scalar_field(f, num_data, split):
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     lt, _ = f.readline().decode("utf-8").split()
     assert lt == "LOOKUP_TABLE"
-    data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
-
+    #workaround for ABQ Error
+    try:
+        data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
+    except:
+        data = f.read().split()
+        data = [float(i) for i in data]
+        data = numpy.array(data)
     return {data_name: data}
 
 
@@ -312,7 +336,14 @@ def _read_vector_field(f, num_data, split, is_ascii):
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
-        data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
+        #workaround for ABQ Error
+        try:
+            data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
+        except:
+            data = f.read().split()
+            data = [float(i) for i in data]
+            data = numpy.array(data)
+            data = data.reshape(-1,3)
     else:
         data = numpy.fromfile(f, count=num_data, sep="", dtype=dtype)
 
@@ -325,7 +356,14 @@ def _read_tensor_field(f, num_data, split, is_ascii):
 
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
-        data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
+        #workaround for ABQ Error
+        try:
+            data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
+        except:
+            data = f.read().split()
+            data = [float(i) for i in data]
+            data = numpy.array(data)
+            data = data.reshape(-1,3,3)
     else:
         data = numpy.fromfile(f, count=9 * num_data, sep="", dtype=dtype).reshape(-1, 3, 3)
 
@@ -341,7 +379,13 @@ def _read_fields(f, num_fields, is_ascii):
         dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
 
         if is_ascii:
-            dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
+            #workaround for ABQ Error
+            try:
+                dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
+            except:
+                dat = f.read().split()
+                dat = [float(i) for i in dat]
+                dat = numpy.array(dat)
         else:
             # Binary data is big endian, see
             # <https://www.vtk.org/Wiki/VTK/Writing_VTK_files_using_python#.22legacy.22>.
@@ -478,12 +522,11 @@ def _write_points(f, points, write_binary):
         points.astype(points.dtype.newbyteorder(">")).tofile(f, sep="")
     else:
         for point in points:
-            
-            if numpy.version.version == '1.6.2':
-                #workaround to handle ABQ Error with tofile function
-                f.write('%s %s %s ' %(point[0], point[1], point[2]))
-            else:
+            #workaround to handle ABQ Error with tofile function
+            try:
                 point.tofile(f, sep=" ")
+            except:
+                f.write('%s %s %s ' %(point[0], point[1], point[2]))
             f.write('\n')
     if write_binary:
         f.write("\n".encode("utf-8"))
@@ -613,15 +656,15 @@ def _write_field_data(f, data, write_binary):
             # ascii
             # values.tofile(f, sep=" ")
             for value in values:
-                if numpy.version.version == '1.6.2':
-                    #workaround to handle ABQ Error with tofile function
+                #workaround to handle ABQ Error with tofile function
+                try:
+                    value.tofile(f, sep=" ")
+                except:
                     try:
                         for v in value:
                             f.write('%s ' %v)
                     except:
                         f.write('%s ' %value)
-                else:
-                    value.tofile(f, sep=" ")
                 f.write('\n')
             # numpy.savetxt(f, points)
     if write_binary:
