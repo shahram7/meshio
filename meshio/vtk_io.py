@@ -255,7 +255,9 @@ def _read_points(f, data_type, is_ascii, num_points):
         try:
             points = numpy.fromfile(f, count=num_points * 3, sep=" ", dtype=dtype)
         except:
-            points = f.read().split()
+            points = []
+            for i in range(num_points):
+                points.append(f.readline().split())
             points = [float(i) for i in points]
             points = numpy.array(points)
     else:
@@ -275,7 +277,9 @@ def _read_cells(f, is_ascii, num_items):
         try:
             c = numpy.fromfile(f, count=num_items, sep=" ", dtype=int)
         except:
-            c = f.read().split()
+            c = []
+            for i in range(num_items):
+                c.append(f.readline().split())
             c = [int(i) for i in c]
             c = numpy.array(c)
             
@@ -293,7 +297,9 @@ def _read_cell_types(f, is_ascii, num_items):
         try:
             ct = numpy.fromfile(f, count=int(num_items), sep=" ", dtype=int)
         except:
-            ct = f.read().split()
+            ct = []
+            for i in range(int(num_items)):
+                ct.append(f.readline().split())
             ct = [int(i) for i in ct]
             ct = numpy.array(ct)
     else:
@@ -324,7 +330,9 @@ def _read_scalar_field(f, num_data, split):
     try:
         data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
     except:
-        data = f.read().split()
+        data = []
+        for i in range(num_data):
+            data.append(f.readline().split())
         data = [float(i) for i in data]
         data = numpy.array(data)
     return {data_name: data}
@@ -340,7 +348,9 @@ def _read_vector_field(f, num_data, split, is_ascii):
         try:
             data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
         except:
-            data = f.read().split()
+            data = []
+            for i in range(3 * num_data):
+                data.append(f.readline().split())
             data = [float(i) for i in data]
             data = numpy.array(data)
             data = data.reshape(-1,3)
@@ -360,7 +370,9 @@ def _read_tensor_field(f, num_data, split, is_ascii):
         try:
             data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
         except:
-            data = f.read().split()
+            data = []
+            for i in range(9 * num_data):
+                data.append(f.readline().split())
             data = [float(i) for i in data]
             data = numpy.array(data)
             data = data.reshape(-1,3,3)
@@ -383,7 +395,9 @@ def _read_fields(f, num_fields, is_ascii):
             try:
                 dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
             except:
-                dat = f.read().split()
+                dat = []
+                for i in range(shape0 * shape1):
+                    dat.append(f.readline().split())
                 dat = [float(i) for i in dat]
                 dat = numpy.array(dat)
         else:
