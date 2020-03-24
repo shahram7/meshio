@@ -29,6 +29,7 @@ from abaqusGui import (
     showAFXWarningDialog,
 )
 
+import re
 
 class CreateSymmTensor(AFXDataDialog):
     """Create a new tensor field from given variables."""
@@ -275,7 +276,9 @@ class ExportODB(AFXDataDialog):
         self.variables = []
         for var in currentViewport.odbDisplay.fieldVariables.variableList:
             self.variables.append(var[0])
-
+        
+        self.variables.sort(key=natural_keys)
+        
         hf_selectors = FXHorizontalFrame(self)
 
         gb_instances = FXGroupBox(hf_selectors, "Instance", FRAME_GROOVE)
@@ -365,6 +368,17 @@ class ExportODB(AFXDataDialog):
         self.fileDialog.show()
         return 1
 
+    def atoi(text):
+        return int(text) if text.isdigit() else text
+
+    def natural_keys(text):
+        '''
+        alist.sort(key=natural_keys) sorts in human order
+        http://nedbatchelder.com/blog/200712/human_sorting.html
+        (See Toothy's implementation in the comments)
+        '''
+        return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+    
     def processUpdates(self):
         """Update fields.
 
