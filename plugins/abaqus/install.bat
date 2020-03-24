@@ -4,7 +4,7 @@ SETLOCAL enabledelayedexpansion
 :: Set SIMULIA base directory here:
 SET root=C:\SIMULIA\CAE\plugins
 
-SET dir=%~dp0
+SET dir="%~dp0"
 
 SET Index=1
 FOR /d %%D IN (%root%\*) DO (

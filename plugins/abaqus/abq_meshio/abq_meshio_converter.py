@@ -343,36 +343,33 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kw
             # element
             fO_elem = fO_elem.getSubset(position=CENTROID)
             print("processing " + fO.name)
-            etypes = set(
-                [abaqus_to_meshio_type(etype) for etype in fO_elem.baseElementTypes]
-            )
-            # only one element type in fO
-            assert len(etypes) == 1, ERROR_DIFFERENT_ETYPES.format(etypes, inst_name)
-            if fO.type == TENSOR_3D_FULL:
-                values_list = [
-                    np.array(
-                        [
-                            __reshape_TENSOR_3D_FULL(value.data)
-                            for value in fO_elem.values
-                        ]
-                    )
-                ]
-            elif fO.type == TENSOR_3D_PLANAR:
-                values_list = [
-                    np.array(
-                        [
-                            __reshape_TENSOR_3D_PLANAR(value.data)
-                            for value in fO_elem.values
-                        ]
-                    )
-                ]
-            else:
-                values_list = [np.array([value.data for value in fO_elem.values])]
-
+            
+            cell_data_labels_ = {}
+            
+            for value in fO_elem.values:
+                etype = abaqus_to_meshio_type(value.baseElementType)
+                cell_data_labels_.setdefault(etype,{})
+                if fO.type == TENSOR_3D_FULL:
+                    val_data = __reshape_TENSOR_3D_FULL(value.data)
+                elif fO.type == TENSOR_3D_PLANAR:
+                    val_data = __reshape_TENSOR_3D_PLANAR(value.data)
+                else:
+                    val_data = value.data
+                cell_data_labels_[etype][value.elementLabel] = val_data
+            
+            return cell_data_labels_
+        
+        def sortCellOutput(fO_name,cell_data_labels_,cell_labels):
             cell_data_ = {}
-            for etype, values in zip(etypes, values_list):
-                cell_data_[etype] = {fO.name: values}
-
+            for etype in cell_labels.keys():
+                cell_data_[etype] = {fO_name: []}
+                for label in cell_labels[etype]:
+                    try:
+                        cell_data_[etype][fO_name].append(cell_data_labels_[etype][label])
+                    except:
+                        cell_data_[etype][fO_name].append(np.nan)
+                cell_data_[etype][fO_name] = np.array(cell_data_[etype][fO_name])
+            
             return cell_data_
 
         # assign
@@ -431,6 +428,7 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kw
         # type
         # firstly, we create an empty dict for storing the cell informations
         cells = {}
+        cell_labels = {}
 
         # loop over all elements
         for elem in elements:
@@ -438,11 +436,8 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kw
             con = [nodeLU[c] for c in elem.connectivity]
             # get the type of element, convert to meshio representation
             etype = abaqus_to_meshio_type(str(elem.type))
-            if etype in cells.keys():
-                cells[etype].append(con)
-            else:
-                # create a new key for a new element set
-                cells[etype] = [con]
+            cells.setdefault(etype,[]).append(con)
+            cell_labels.setdefault(etype,[]).append(elem.label)
 
         cells.update((key, np.array(cons)) for key, cons in cells.items())
 
@@ -463,7 +458,8 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kw
                         if fO_location == NODAL:
                             processPointOutput(fO)
                         elif fO_location in [CENTROID, INTEGRATION_POINT]:
-                            cell_data_ = processCellOutput(fO)
+                            cell_data_labels_ = processCellOutput(fO)
+                            cell_data_ = sortCellOutput(fO.name,cell_data_labels_,cell_labels)
                             cell_data = __merge_cellData_dicts(cell_data, cell_data_)
                     else:
                         print(ERROR_NO_FIELD_DATA.format(field_name, inst_name))
@@ -484,7 +480,8 @@ def convertODBtoMeshio(odbObject, frame, list_of_outputs=[], deformed=True, **kw
                         if fO_location == NODAL:
                             processPointOutput(fO)
                         elif fO_location in [CENTROID, INTEGRATION_POINT]:
-                            cell_data_ = processCellOutput(fO)
+                            cell_data_labels_ = processCellOutput(fO)
+                            cell_data_ = sortCellOutput(fO.name,cell_labels,cell_data_labels_)
                             cell_data = __merge_cellData_dicts(cell_data, cell_data_)
 
                     if fO_location == NODAL:
