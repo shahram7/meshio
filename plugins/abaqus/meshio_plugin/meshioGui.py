@@ -258,6 +258,18 @@ class ExportODB(AFXDataDialog):
     [ID_CLICKED_FILE_BUTTON] = range(AFXDataDialog.ID_LAST, AFXDataDialog.ID_LAST + 1)
 
     def __init__(self, form):
+
+        def atoi(text):
+            return int(text) if text.isdigit() else text
+
+        def natural_keys(text):
+            '''
+            alist.sort(key=natural_keys) sorts in human order
+            http://nedbatchelder.com/blog/200712/human_sorting.html
+            (See Toothy's implementation in the comments)
+            '''
+            return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+        
         """Set up the initial dialog and connect Buttons to actions."""
         self.form = form
         # find current viewport
@@ -367,17 +379,6 @@ class ExportODB(AFXDataDialog):
         self.fileDialog.create()
         self.fileDialog.show()
         return 1
-
-    def atoi(text):
-        return int(text) if text.isdigit() else text
-
-    def natural_keys(text):
-        '''
-        alist.sort(key=natural_keys) sorts in human order
-        http://nedbatchelder.com/blog/200712/human_sorting.html
-        (See Toothy's implementation in the comments)
-        '''
-        return [ atoi(c) for c in re.split(r'(\d+)', text) ]
     
     def processUpdates(self):
         """Update fields.
