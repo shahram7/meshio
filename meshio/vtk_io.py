@@ -251,15 +251,15 @@ def read_buffer(f):
 def _read_points(f, data_type, is_ascii, num_points):
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
-        #workaround for ABQ Error
-        try:
-            points = numpy.fromfile(f, count=num_points * 3, sep=" ", dtype=dtype)
-        except:
+        if numpy.version.version == '1.6.2':
+            #workaround to handle ABQ Error with tofile function
             points = []
             for i in range(num_points):
                 points.append(f.readline().split())
             points = [float(i) for i in points]
             points = numpy.array(points)
+        else:
+            points = numpy.fromfile(f, count=num_points * 3, sep=" ", dtype=dtype)
     else:
         # Binary data is big endian, see
         # <https://www.vtk.org/Wiki/VTK/Writing_VTK_files_using_python#.22legacy.22>.
@@ -273,15 +273,17 @@ def _read_points(f, data_type, is_ascii, num_points):
 
 def _read_cells(f, is_ascii, num_items):
     if is_ascii:
-        #workaround for ABQ Error
-        try:
-            c = numpy.fromfile(f, count=num_items, sep=" ", dtype=int)
-        except:
+        
+        if numpy.version.version == '1.6.2':
+            #workaround for ABQ Error
             c = []
             for i in range(num_items):
                 c.append(f.readline().split())
             c = [int(i) for i in c]
             c = numpy.array(c)
+        else:
+            c = numpy.fromfile(f, count=num_items, sep=" ", dtype=int)
+
             
     else:
         c = numpy.fromfile(f, count=num_items, dtype=">i4")
@@ -294,14 +296,14 @@ def _read_cells(f, is_ascii, num_items):
 def _read_cell_types(f, is_ascii, num_items):
     if is_ascii:
         #workaround for ABQ Error
-        try:
-            ct = numpy.fromfile(f, count=int(num_items), sep=" ", dtype=int)
-        except:
+        if numpy.version.version == '1.6.2':
             ct = []
             for i in range(int(num_items)):
                 ct.append(f.readline().split())
             ct = [int(i) for i in ct]
             ct = numpy.array(ct)
+        else:
+            ct = numpy.fromfile(f, count=int(num_items), sep=" ", dtype=int)
     else:
         # binary
         ct = numpy.fromfile(f, count=int(num_items), dtype=">i4")
@@ -327,14 +329,14 @@ def _read_scalar_field(f, num_data, split):
     lt, _ = f.readline().decode("utf-8").split()
     assert lt == "LOOKUP_TABLE"
     #workaround for ABQ Error
-    try:
-        data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
-    except:
+    if numpy.version.version == '1.6.2':
         data = []
         for i in range(num_data):
             data.append(f.readline().split())
         data = [float(i) for i in data]
         data = numpy.array(data)
+    else:
+        data = numpy.fromfile(f, count=num_data, sep=" ", dtype=dtype)
     return {data_name: data}
 
 
@@ -345,15 +347,15 @@ def _read_vector_field(f, num_data, split, is_ascii):
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
         #workaround for ABQ Error
-        try:
-            data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
-        except:
+        if numpy.version.version == '1.6.2':
             data = []
             for i in range(3 * num_data):
                 data.append(f.readline().split())
             data = [float(i) for i in data]
             data = numpy.array(data)
             data = data.reshape(-1,3)
+        else:
+            data = numpy.fromfile(f, count=3 * num_data, sep=" ", dtype=dtype).reshape(-1, 3)
     else:
         data = numpy.fromfile(f, count=num_data, sep="", dtype=dtype)
 
@@ -367,15 +369,15 @@ def _read_tensor_field(f, num_data, split, is_ascii):
     dtype = numpy.dtype(vtk_to_numpy_dtype_name[data_type])
     if is_ascii:
         #workaround for ABQ Error
-        try:
-            data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)
-        except:
+        if numpy.version.version == '1.6.2':
             data = []
             for i in range(9 * num_data):
                 data.append(f.readline().split())
             data = [float(i) for i in data]
             data = numpy.array(data)
             data = data.reshape(-1,3,3)
+        else:
+            data = numpy.fromfile(f, count=9 * num_data, sep=" ", dtype=dtype).reshape(-1, 3, 3)            
     else:
         data = numpy.fromfile(f, count=9 * num_data, sep="", dtype=dtype).reshape(-1, 3, 3)
 
@@ -392,14 +394,14 @@ def _read_fields(f, num_fields, is_ascii):
 
         if is_ascii:
             #workaround for ABQ Error
-            try:
-                dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
-            except:
+            if numpy.version.version == '1.6.2':
                 dat = []
                 for i in range(shape0 * shape1):
                     dat.append(f.readline().split())
                 dat = [float(i) for i in dat]
                 dat = numpy.array(dat)
+            else:
+                dat = numpy.fromfile(f, count=shape0 * shape1, sep=" ", dtype=dtype)
         else:
             # Binary data is big endian, see
             # <https://www.vtk.org/Wiki/VTK/Writing_VTK_files_using_python#.22legacy.22>.
@@ -537,10 +539,10 @@ def _write_points(f, points, write_binary):
     else:
         for point in points:
             #workaround to handle ABQ Error with tofile function
-            try:
-                point.tofile(f, sep=" ")
-            except:
+            if numpy.version.version == '1.6.2':
                 f.write('%s %s %s ' %(point[0], point[1], point[2]))
+            else:
+                point.tofile(f, sep=" ")
             f.write('\n')
     if write_binary:
         f.write("\n".encode("utf-8"))
@@ -671,14 +673,14 @@ def _write_field_data(f, data, write_binary):
             # values.tofile(f, sep=" ")
             for value in values:
                 #workaround to handle ABQ Error with tofile function
-                try:
-                    value.tofile(f, sep=" ")
-                except:
+                if numpy.version.version == '1.6.2':
                     try:
                         for v in value:
                             f.write('%s ' %v)
                     except:
                         f.write('%s ' %value)
+                else:
+                    value.tofile(f, sep=" ")
                 f.write('\n')
             # numpy.savetxt(f, points)
     if write_binary:
