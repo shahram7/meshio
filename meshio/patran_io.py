@@ -196,6 +196,7 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
                     )
                 else:
                     mesh.point_data = {name: values}
+        mesh.point_data[name] = numpy.squeeze(mesh.point_data[name])
     return mesh
 
 
@@ -220,7 +221,7 @@ def read_nod_buffer(f, mesh, point_gids, autoremove):
         line = node_id_map[ID]
         array[line, :] = values
 
-    mesh.point_data = {name: array}
+    mesh.point_data = {name: numpy.squeeze(array)}
     return mesh
 
 
