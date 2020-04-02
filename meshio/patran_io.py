@@ -16,7 +16,9 @@ caas/sfdcarticles/sfdcarticles/How-to-export-fiber-orientation-results
 """
 
 import os
+
 import numpy
+
 from .mesh import Mesh
 
 pat_to_meshio_type = {
@@ -31,8 +33,14 @@ pat_to_meshio_type = {
 meshio_to_pat_type = {v: k for k, v in pat_to_meshio_type.items()}
 
 
-def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
-         scale=1.0, autoremove=True):
+def read(
+    filename,
+    ele_filename=None,
+    nod_filename=None,
+    xml_filename=None,
+    scale=1.0,
+    autoremove=True,
+):
     """Read a Patran *.pat file.
 
     If a *.ele file, *.xml file or *.nod file is provided or if it has the
@@ -63,19 +71,20 @@ def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
         mesh, element_gids, point_gids = read_pat_buffer(f, scale)
 
     # if *.ele file is present: Add cell data
-    ele_filename = ele_filename or filename.replace('.pat', '.ele')
+    ele_filename = ele_filename or filename.replace(".pat", ".ele")
     if os.path.isfile(ele_filename):
         with open(ele_filename, "r") as f:
             mesh = read_ele_buffer(f, mesh, element_gids, autoremove)
 
     # if *.xml file is present: Add cell or node data
-    xml_filename = xml_filename or filename.replace('.pat', '.xml')
+    xml_filename = xml_filename or filename.replace(".pat", ".xml")
     if os.path.isfile(xml_filename):
-        mesh = read_xml_buffer(xml_filename, mesh, element_gids, point_gids,
-                               autoremove)
+        mesh = read_xml_buffer(
+            xml_filename, mesh, element_gids, point_gids, autoremove
+        )
 
     # if *.nod file is present: Add point data
-    nod_filename = nod_filename or filename.replace('.pat', '.nod')
+    nod_filename = nod_filename or filename.replace(".pat", ".nod")
     if os.path.isfile(nod_filename):
         with open(nod_filename, "r") as f:
             mesh = read_nod_buffer(f, mesh, point_gids, autoremove)
@@ -86,7 +95,7 @@ def read(filename, ele_filename=None, nod_filename=None, xml_filename=None,
 def read_ele_buffer(f, mesh, element_gids, autoremove):
     """Read element based data file."""
 
-    name = f.readline().replace(' ', '_').rstrip('\n')
+    name = f.readline().replace(" ", "_").rstrip("\n")
     dimensions = f.readline().split()
     N = int(dimensions[0])
     order = int(dimensions[-1])
@@ -114,7 +123,7 @@ def read_ele_buffer(f, mesh, element_gids, autoremove):
                     mesh.cells[elem_type][pos] = -numpy.ones_like(nodes)
                 else:
                     print("No data attached to Element %d. Writing NaN." % gid)
-                    values = numpy.nan*numpy.ones(order)
+                    values = numpy.nan * numpy.ones(order)
                     if elem_type in mesh.cell_data.keys():
                         mesh.cell_data[elem_type][name].append(values)
                     else:
@@ -133,15 +142,15 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
 
     data = {}
 
-    dataset = root.find('Dataset')
-    type = dataset.find('DataType').text
-    order = int(dataset.find('NumberOfComponents').text)
-    name = dataset.find('DeptVar').get('Name').replace(' ', '_').rstrip('\n')
-    blocks = dataset.find('Blocks')
+    dataset = root.find("Dataset")
+    type = dataset.find("DataType").text
+    order = int(dataset.find("NumberOfComponents").text)
+    name = dataset.find("DeptVar").get("Name").replace(" ", "_").rstrip("\n")
+    blocks = dataset.find("Blocks")
 
-    for item in blocks.find('Block').find('Data'):
-        ID = int(item.get('ID'))
-        line = item.find('DeptValues').text
+    for item in blocks.find("Block").find("Data"):
+        ID = int(item.get("ID"))
+        line = item.find("DeptValues").text
         values = map(float, line.split())
         data[ID] = numpy.array(values)
 
@@ -159,9 +168,11 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
                         nodes = mesh.cells[elem_type][pos]
                         mesh.cells[elem_type][pos] = -numpy.ones_like(nodes)
                     else:
-                        print("No data attached to Element %d. Writing NaN."
-                              % gid)
-                        values = numpy.nan*numpy.ones(order)
+                        print(
+                            "No data attached to Element %d. Writing NaN."
+                            % gid
+                        )
+                        values = numpy.nan * numpy.ones(order)
                         if name in mesh.cell_data[elem_type].keys():
                             mesh.cell_data[elem_type][name].append(values)
                         else:
@@ -172,15 +183,17 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
             try:
                 if name in mesh.point_data.keys():
                     mesh.point_data[name] = numpy.vstack(
-                        (mesh.point_data[name], data[gid]))
+                        (mesh.point_data[name], data[gid])
+                    )
                 else:
                     mesh.point_data = {name: data[gid]}
             except KeyError:
                 print("No data attached to Point %d. Writing NaN." % gid)
-                values = numpy.nan*numpy.ones(order)
+                values = numpy.nan * numpy.ones(order)
                 if name in mesh.point_data.keys():
                     mesh.point_data[name] = numpy.vstack(
-                        (mesh.point_data[name], values))
+                        (mesh.point_data[name], values)
+                    )
                 else:
                     mesh.point_data = {name: values}
     return mesh
@@ -192,13 +205,13 @@ def read_nod_buffer(f, mesh, point_gids, autoremove):
     for line, id in enumerate(point_gids):
         node_id_map[id] = line
 
-    name = f.readline().replace(' ', '_').rstrip('\n')
+    name = f.readline().replace(" ", "_").rstrip("\n")
     dimensions = f.readline().split()
     N = int(dimensions[0])
     order = int(dimensions[-1])
     f.readline()
 
-    array = numpy.nan*numpy.ones([N, order])
+    array = numpy.nan * numpy.ones([N, order])
 
     for i in range(N):
         line = f.readline().split()
@@ -266,7 +279,7 @@ def _read_node(f, scale):
     === ===== === ====== === ===
     """
     line = f.readline()
-    entries = [line[i:i + 16] for i in range(0, len(line), 16)]
+    entries = [line[i : i + 16] for i in range(0, len(line), 16)]
     point = [scale * float(coordinate) for coordinate in entries[:-1]]
     f.readline()
     return point
@@ -302,8 +315,10 @@ def _delete_cells(mesh):
     for elem_type in mesh.cells.keys():
         mask = ~(mesh.cells[elem_type] < 0).any(axis=1)
         mesh.cells[elem_type] = mesh.cells[elem_type][mask]
-        print("automatically removed %d cells"
-              % (numpy.size(mask)-numpy.sum(mask)))
+        print(
+            "automatically removed %d cells"
+            % (numpy.size(mask) - numpy.sum(mask))
+        )
     return mesh
 
 
