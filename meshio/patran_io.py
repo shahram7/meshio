@@ -302,7 +302,7 @@ def _read_cell(f):
     """
     f.readline()
     entries = f.readline().split()
-    lnodes = map(int, entries)
+    lnodes = list(map(int, entries))
     lnodes = numpy.trim_zeros(lnodes)
     return numpy.array(lnodes)
 
