@@ -208,18 +208,20 @@ def read_nod_buffer(f, mesh, point_gids, autoremove):
 
     name = f.readline().replace(" ", "_").rstrip("\n")
     dimensions = f.readline().split()
-    N = int(dimensions[0])
+    N = len(point_gids)
     order = int(dimensions[-1])
     f.readline()
 
     array = numpy.nan * numpy.ones([N, order])
 
     for i in range(N):
-        line = f.readline().split()
-        ID = int(line[0])
-        values = map(float, line[1:])
-        line = node_id_map[ID]
-        array[line, :] = values
+        line = f.readline()
+        if line:
+            line = line.split()
+            ID = int(line[0])
+            values = map(float, line[1:])
+            line = node_id_map[ID]
+            array[line, :] = values
 
     mesh.point_data = {name: numpy.squeeze(array)}
     return mesh
