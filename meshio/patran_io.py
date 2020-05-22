@@ -38,6 +38,7 @@ def read(
     ele_filename=None,
     nod_filename=None,
     xml_filename=None,
+    xml_temp_block=None,
     scale=1.0,
     autoremove=True,
 ):
@@ -60,6 +61,9 @@ def read(
 
         xml_filename : str, optional
             element-wise data file
+                 xml_temp_block = int, necessary for temperature xml file
+                     because it contains different
+                     blocks for different points in time
 
         scale : float
             scale factor for nodes
@@ -80,7 +84,7 @@ def read(
     xml_filename = xml_filename or filename.replace(".pat", ".xml")
     if os.path.isfile(xml_filename):
         mesh = read_xml_buffer(
-            xml_filename, mesh, element_gids, point_gids, autoremove
+            xml_filename, mesh, element_gids, point_gids, autoremove, xml_temp_block,
         )
 
     # if *.nod file is present: Add point data
@@ -133,7 +137,7 @@ def read_ele_buffer(f, mesh, element_gids, autoremove):
     return mesh
 
 
-def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
+def read_xml_buffer(xml_filename, xml_temp_block, mesh, element_gids, point_gids, autoremove):
     """Read element based data file."""
     import xml.etree.ElementTree as ET
 
@@ -148,11 +152,22 @@ def read_xml_buffer(xml_filename, mesh, element_gids, point_gids, autoremove):
     name = dataset.find("DeptVar").get("Name").replace(" ", "_").rstrip("\n")
     blocks = dataset.find("Blocks")
 
-    for item in blocks.find("Block").find("Data"):
-        ID = int(item.get("ID"))
-        line = item.find("DeptValues").text
-        values = map(float, line.split())
-        data[ID] = numpy.array(values)
+    if "Temperature" in name:
+        block = dataset.findall('Blocks/Block')
+        for item in block:
+            index = item.attrib.get('Index')
+            if index == int(xml_temp_block):
+                for item in blocks.find('Block').find('Data'):
+                    ID = int(item.get('ID'))
+                    line = item.find('DeptValues').text
+                    values = map(float, line.split())
+                    data[ID] = numpy.array(values)
+    else:
+        for item in blocks.find('Block').find('Data'):
+            ID = int(item.get('ID'))
+            line = item.find('DeptValues').text
+            values = map(float, line.split())
+            data[ID] = numpy.array(values)
 
     if "ELDT" in type:
         for elem_type in mesh.cells.keys():
